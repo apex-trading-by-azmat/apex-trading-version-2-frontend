@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { Cpu, ArrowRight, ShieldCheck } from "lucide-react";
+import Image from "next/image";
+import assets from "@/assets/assets";
+import { ArrowRight } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function ClientsideLayout({
@@ -13,8 +15,15 @@ export default function ClientsideLayout({
       <header className="sticky top-0 z-40 h-16 border-b border-border bg-background/90 backdrop-blur-md px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto h-full flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-center">
-              <Cpu className="w-4 h-4 text-primary" />
+            <div className="w-8 h-8 rounded-lg bg-secondary/80 border border-border flex items-center justify-center p-1 overflow-hidden shadow-sm">
+              <Image
+                src={assets.logo}
+                alt="Apex Signal Trading Logo"
+                width={32}
+                height={32}
+                className="w-full h-full object-contain"
+                priority
+              />
             </div>
             <div>
               <span className="text-xs font-semibold tracking-[0.18em] text-primary uppercase block leading-none">Apex</span>
@@ -24,10 +33,11 @@ export default function ClientsideLayout({
 
           {/* Nav links */}
           <nav className="hidden md:flex items-center gap-6 text-xs text-muted-foreground">
-            <Link href="#features" className="hover:text-foreground transition-colors">Architecture</Link>
+            <Link href="#rules" className="hover:text-foreground transition-colors">30s Window</Link>
             <Link href="#strategies" className="hover:text-foreground transition-colors">6 Strategies</Link>
-            <Link href="#rules" className="hover:text-foreground transition-colors">Decision Engine</Link>
-            <Link href="#pricing" className="hover:text-foreground transition-colors">30-Day Pass</Link>
+            <Link href="#features" className="hover:text-foreground transition-colors">Non-Custodial</Link>
+            <Link href="#pricing" className="hover:text-foreground transition-colors">Pricing</Link>
+            <Link href="#faq" className="hover:text-foreground transition-colors">FAQ</Link>
           </nav>
 
           {/* Action buttons */}
@@ -35,15 +45,15 @@ export default function ClientsideLayout({
             <ThemeToggle variant="pill" />
             <Link
               href="/auth/login"
-              className="text-xs font-semibold text-muted-foreground hover:text-foreground px-3 py-1.5 transition-colors"
+              className="text-xs font-semibold text-muted-foreground hover:text-foreground px-2.5 py-1.5 transition-colors"
             >
               Sign In
             </Link>
             <Link
-              href="/dashboard"
+              href="/auth/register"
               className="px-3.5 py-1.5 rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-semibold transition-all flex items-center gap-1.5 shadow-lg shadow-primary/20"
             >
-              Launch Terminal
+              Get 30-Day Pass ($25)
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
@@ -59,8 +69,14 @@ export default function ClientsideLayout({
       <footer className="border-t border-border bg-card py-8 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded bg-primary/15 flex items-center justify-center text-primary">
-              <Cpu className="w-3.5 h-3.5" />
+            <div className="w-6 h-6 rounded bg-secondary/80 border border-border flex items-center justify-center p-0.5 overflow-hidden">
+              <Image
+                src={assets.logo}
+                alt="Apex Signal Trading Logo"
+                width={20}
+                height={20}
+                className="w-full h-full object-contain"
+              />
             </div>
             <span className="text-foreground font-semibold">Apex Signal Trading</span>
             <span className="text-subtle">·</span>

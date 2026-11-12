@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
+import assets from "@/assets/assets";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
@@ -121,9 +123,16 @@ export function AppShell({
         {/* Logo */}
         <div className="flex items-center justify-between h-16 px-5 border-b border-border shrink-0">
           <Link href="/dashboard" className="flex items-center gap-3 hover:opacity-90 transition-opacity">
-            <span className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-center shrink-0">
-              <Cpu className="w-4 h-4 text-primary" />
-            </span>
+            <div className="w-9 h-9 rounded-lg bg-secondary/80 border border-border flex items-center justify-center shrink-0 p-1 overflow-hidden shadow-sm">
+              <Image
+                src={assets.logo}
+                alt="Apex Signal Trading Logo"
+                width={36}
+                height={36}
+                className="w-full h-full object-contain"
+                priority
+              />
+            </div>
             <span className="flex flex-col">
               <span className="text-xs font-semibold tracking-[0.18em] text-primary uppercase leading-none">
                 Apex

@@ -26,7 +26,7 @@ export const EASYPAISA_CONFIG = {
   accountTitle: "Azmat Ullah khan",
   accountNumber: "03445679900",
   bankName: "Easypaisa (Telenor Microfinance Bank)",
-  amountPKR: "3,000",
+  priceUSD: "$25",
   validityDays: 30,
 };
 
@@ -38,7 +38,7 @@ const DEFAULT_SUBMISSIONS: PaymentSubmission[] = [
     senderName: "Omar Ali",
     senderPhone: "03001234567",
     transactionId: "TX9823419082",
-    amount: "PKR 3,000",
+    amount: "$25",
     status: "pending",
     submittedAt: "2026-11-11 19:45 UTC",
     screenshotName: "easypaisa_receipt_9823.png",
@@ -50,7 +50,7 @@ const DEFAULT_SUBMISSIONS: PaymentSubmission[] = [
     senderName: "Aaliyah K.",
     senderPhone: "03335558899",
     transactionId: "TX7720912384",
-    amount: "PKR 3,000",
+    amount: "$25",
     status: "approved",
     submittedAt: "2026-11-10 14:12 UTC",
     screenshotName: "receipt_aaliyah.jpg",

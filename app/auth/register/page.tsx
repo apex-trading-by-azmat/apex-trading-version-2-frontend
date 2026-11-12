@@ -58,7 +58,7 @@ export default function RegisterWizardPage() {
     receiptFile: null as File | null,
     receiptFileName: "",
     receiptPreviewUrl: "",
-    amount: "PKR 3,000",
+    amount: "$25",
   });
 
   // Step 3 & 4: Status and License data
@@ -182,7 +182,7 @@ export default function RegisterWizardPage() {
       senderName: paymentData.senderName || formData.name,
       senderPhone: paymentData.senderPhone,
       transactionId: paymentData.transactionId.trim(),
-      amount: "PKR 3,000",
+      amount: "$25",
       status: "pending",
       submittedAt: new Date().toISOString().replace("T", " ").slice(0, 16) + " UTC",
       screenshotName: paymentData.receiptFileName || "easypaisa_receipt.jpg",
@@ -474,7 +474,7 @@ export default function RegisterWizardPage() {
             </div>
             <h2 className="text-xl font-bold text-foreground tracking-tight">Easypaisa Payment Transfer</h2>
             <p className="text-xs text-muted-foreground mt-1">
-              Transfer PKR 3,000 for your 30-day license and submit proof below.
+              Transfer $25 for your 30-day license and submit proof below.
             </p>
           </div>
 
@@ -542,7 +542,7 @@ export default function RegisterWizardPage() {
             </div>
 
             <div className="mt-3 flex items-center justify-between text-[11px] text-muted-foreground bg-card/60 p-2.5 rounded-lg border border-border">
-              <span>Required Amount: <strong className="text-foreground font-mono">PKR 3,000</strong></span>
+              <span>Required Amount: <strong className="text-foreground font-mono">$25</strong></span>
               <span>Validity: <strong className="text-up font-mono">30 Days Fixed</strong></span>
             </div>
           </div>

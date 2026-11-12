@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { Cpu, ShieldCheck } from "lucide-react";
+import Image from "next/image";
+import assets from "@/assets/assets";
+import { ShieldCheck } from "lucide-react";
 
 export default function AuthLayout({
   children,
@@ -11,8 +13,15 @@ export default function AuthLayout({
       {/* Top Header */}
       <div className="flex items-center justify-between max-w-6xl w-full mx-auto py-2">
         <Link href="/" className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-center">
-            <Cpu className="w-4 h-4 text-primary" />
+          <div className="w-8 h-8 rounded-lg bg-secondary/80 border border-border flex items-center justify-center p-1 overflow-hidden shadow-sm">
+            <Image
+              src={assets.logo}
+              alt="Apex Signal Trading Logo"
+              width={32}
+              height={32}
+              className="w-full h-full object-contain"
+              priority
+            />
           </div>
           <div>
             <span className="text-xs font-semibold tracking-[0.18em] text-primary uppercase block leading-none">Apex</span>
