@@ -353,7 +353,7 @@ export default function RegisterWizardPage() {
           STEP 1: SIGN UP
       ══════════════════════════════════════════════════ */}
       {currentStep === 1 && (
-        <div className="rounded-xl border border-border bg-card p-6 sm:p-8 shadow-2xl">
+        <div className="rounded-xl border border-border bg-card p-6 sm:p-8 shadow-lg shadow-primary/10">
           <div className="mb-6">
             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-primary/10 border border-primary/20 text-xs font-mono text-primary mb-2">
               Step 1 of 4: Account Details
@@ -376,7 +376,7 @@ export default function RegisterWizardPage() {
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full pl-9 pr-3 py-2.5 rounded-lg bg-secondary border border-border text-xs text-foreground focus:outline-none focus:border-primary transition-colors"
+                  className="w-full pl-9 pr-3 py-2.5 rounded-lg bg-secondary border border-border text-xs text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
                   placeholder="Azmat Ullah"
                 />
               </div>
@@ -393,7 +393,7 @@ export default function RegisterWizardPage() {
                   required
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full pl-9 pr-3 py-2.5 rounded-lg bg-secondary border border-border text-xs text-foreground focus:outline-none focus:border-primary transition-colors"
+                  className="w-full pl-9 pr-3 py-2.5 rounded-lg bg-secondary border border-border text-xs text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
                   placeholder="trader@apextrading.io"
                 />
               </div>
@@ -411,7 +411,7 @@ export default function RegisterWizardPage() {
                     required
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="w-full pl-9 pr-3 py-2.5 rounded-lg bg-secondary border border-border text-xs text-foreground focus:outline-none focus:border-primary transition-colors"
+                    className="w-full pl-9 pr-3 py-2.5 rounded-lg bg-secondary border border-border text-xs text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
                     placeholder="Min 8 characters"
                   />
                 </div>
@@ -428,7 +428,7 @@ export default function RegisterWizardPage() {
                     required
                     value={formData.confirmPassword}
                     onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                    className="w-full pl-9 pr-3 py-2.5 rounded-lg bg-secondary border border-border text-xs text-foreground focus:outline-none focus:border-primary transition-colors"
+                    className="w-full pl-9 pr-3 py-2.5 rounded-lg bg-secondary border border-border text-xs text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
                     placeholder="Repeat password"
                   />
                 </div>
@@ -447,7 +447,7 @@ export default function RegisterWizardPage() {
 
             <button
               type="submit"
-              className="w-full py-2.5 rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
+              className="w-full py-2.5 rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-md shadow-primary/20"
             >
               Continue to Step 2: Payment Proof
               <ArrowRight className="w-4 h-4" />
@@ -467,7 +467,7 @@ export default function RegisterWizardPage() {
           STEP 2: PAYMENT PROOF SUBMISSION
       ══════════════════════════════════════════════════ */}
       {currentStep === 2 && (
-        <div className="rounded-xl border border-border bg-card p-6 sm:p-8 shadow-2xl">
+        <div className="rounded-xl border border-border bg-card p-6 sm:p-8 shadow-lg shadow-primary/10">
           <div className="mb-6">
             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-primary/10 border border-primary/20 text-xs font-mono text-primary mb-2">
               Step 2 of 4: Manual Payment
@@ -560,7 +560,7 @@ export default function RegisterWizardPage() {
                   value={paymentData.senderName}
                   onChange={(e) => setPaymentData({ ...paymentData, senderName: e.target.value })}
                   placeholder="Your Easypaisa Title"
-                  className="w-full px-3 py-2.5 rounded-lg bg-secondary border border-border text-xs text-foreground focus:outline-none focus:border-primary transition-colors"
+                  className="w-full px-3 py-2.5 rounded-lg bg-secondary border border-border text-xs text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
                 />
               </div>
 
@@ -574,7 +574,7 @@ export default function RegisterWizardPage() {
                   value={paymentData.senderPhone}
                   onChange={(e) => setPaymentData({ ...paymentData, senderPhone: e.target.value })}
                   placeholder="03XX-XXXXXXX"
-                  className="w-full px-3 py-2.5 rounded-lg bg-secondary border border-border text-xs text-foreground focus:outline-none focus:border-primary transition-colors"
+                  className="w-full px-3 py-2.5 rounded-lg bg-secondary border border-border text-xs text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
                 />
               </div>
             </div>
@@ -589,7 +589,7 @@ export default function RegisterWizardPage() {
                 value={paymentData.transactionId}
                 onChange={(e) => setPaymentData({ ...paymentData, transactionId: e.target.value })}
                 placeholder="e.g. TX9841029410 or 11-digit TID"
-                className="w-full px-3 py-2.5 rounded-lg bg-secondary border border-border text-xs font-mono text-foreground focus:outline-none focus:border-primary transition-colors"
+                className="w-full px-3 py-2.5 rounded-lg bg-secondary border border-border text-xs font-mono text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
               />
               <p className="text-[10px] text-subtle mt-1">
                 Enter the unique reference code from the Easypaisa SMS receipt or app confirmation.
@@ -645,7 +645,7 @@ export default function RegisterWizardPage() {
               </button>
               <button
                 type="submit"
-                className="flex-1 py-2.5 rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
+                className="flex-1 py-2.5 rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-md shadow-primary/20"
               >
                 Submit Payment Proof for Verification
                 <ArrowRight className="w-4 h-4" />
@@ -659,7 +659,7 @@ export default function RegisterWizardPage() {
           STEP 3: PAYMENT VERIFICATION BY ADMIN
       ══════════════════════════════════════════════════ */}
       {currentStep === 3 && (
-        <div className="rounded-xl border border-border bg-card p-6 sm:p-8 shadow-2xl">
+        <div className="rounded-xl border border-border bg-card p-6 sm:p-8 shadow-lg shadow-primary/10">
           <div className="mb-6">
             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-warning/10 border border-warning/20 text-xs font-mono text-warning mb-2">
               Step 3 of 4: Admin Verification
@@ -788,7 +788,7 @@ export default function RegisterWizardPage() {
                   setCurrentStep(4);
                   localStorage.setItem("apex_reg_step", "4");
                 }}
-                className="w-full py-2.5 rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
+                className="w-full py-2.5 rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-md shadow-primary/20"
               >
                 Proceed to Step 4: Enter License Key
                 <ArrowRight className="w-4 h-4" />
@@ -802,7 +802,7 @@ export default function RegisterWizardPage() {
           STEP 4: ENTERING THE LICENSE (ACCOUNT CREATION COMPLETE)
       ══════════════════════════════════════════════════ */}
       {currentStep === 4 && (
-        <div className="rounded-xl border border-border bg-card p-6 sm:p-8 shadow-2xl">
+        <div className="rounded-xl border border-border bg-card p-6 sm:p-8 shadow-lg shadow-primary/10">
           {!accountComplete ? (
             <>
               <div className="mb-6">
@@ -839,7 +839,7 @@ export default function RegisterWizardPage() {
                       value={licenseInput}
                       onChange={(e) => setLicenseInput(e.target.value.toUpperCase())}
                       placeholder="e.g. APEX-30D-XXXX-YYYY"
-                      className="w-full pl-9 pr-3 py-2.5 rounded-lg bg-secondary border border-border text-xs font-mono font-semibold text-foreground focus:outline-none focus:border-primary transition-colors uppercase tracking-wider"
+                      className="w-full pl-9 pr-3 py-2.5 rounded-lg bg-secondary border border-border text-xs font-mono font-semibold text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors uppercase tracking-wider"
                     />
                   </div>
                 </div>
@@ -872,7 +872,7 @@ export default function RegisterWizardPage() {
                   <button
                     type="submit"
                     disabled={isActivating}
-                    className="flex-1 py-2.5 rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20 disabled:opacity-50"
+                    className="flex-1 py-2.5 rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-md shadow-primary/20 disabled:opacity-50"
                   >
                     {isActivating ? (
                       <>

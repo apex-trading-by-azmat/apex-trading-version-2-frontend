@@ -2,6 +2,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { strategyCards } from "@/lib/mock-data";
 import { Layers, Sliders, CheckCircle2, TrendingUp } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export default function StrategiesPage() {
   return (
@@ -11,41 +12,51 @@ export default function StrategiesPage() {
     >
       <div className="space-y-5">
         {/* Top Summary Banner */}
-        <div className="p-4 rounded-xl bg-card border border-border flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="p-4 rounded-xl bg-card border border-border shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-center text-primary">
+            <div className="w-10 h-10 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-center text-primary shadow-sm shadow-primary/10">
               <Layers className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-foreground">Centralized Hypothesis Validation</h3>
+              <h3 className="text-sm font-semibold tracking-tight text-foreground">
+                Centralized Hypothesis Validation
+              </h3>
               <p className="text-xs text-muted-foreground">
                 Strategies evaluate market conditions independently without sharing state to avoid correlation bias.
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2 self-start md:self-auto text-xs font-mono">
-            <span className="px-2.5 py-1 rounded bg-secondary border border-border text-muted-foreground">
-              Consensus Threshold: <strong className="text-primary">4 of 6</strong>
+          <div className="flex items-center gap-3 self-start md:self-auto text-xs font-mono">
+            <span className={cn("px-2.5 py-1 rounded-lg border font-medium whitespace-nowrap", "text-primary border-primary/30 bg-primary/5")}>
+              Consensus Threshold: <strong className="text-primary font-bold">4 of 6</strong>
             </span>
-            <span className="px-2.5 py-1 rounded bg-secondary border border-border text-muted-foreground">
-              Min Score: <strong className="text-up">70/100</strong>
+            <span className={cn("px-2.5 py-1 rounded-lg border font-medium whitespace-nowrap", "text-up border-up/20 bg-up/5")}>
+              Min Score: <strong className="text-up font-bold">70 / 100</strong>
             </span>
           </div>
         </div>
 
         {/* 6 Strategy Cards Grid */}
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {strategyCards.map((strategy, idx) => (
-            <Card key={strategy.name} className="border-border bg-card hover:border-subtle transition-colors">
+            <Card
+              key={strategy.name}
+              className={cn(
+                "border-border bg-card hover:border-primary/40 transition-all shadow-sm hover:shadow-md",
+                strategy.status === "ACTIVE" ? "border-up/40" : "border-border"
+              )}
+            >
               <CardHeader className="pb-3 border-b border-border">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="w-5 h-5 rounded bg-secondary text-[10px] font-mono text-primary flex items-center justify-center border border-border">
+                    <span className={cn("w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-bold font-mono border shrink-0", "bg-primary/10 text-primary border-primary/20")}>
                       0{idx + 1}
                     </span>
-                    <CardTitle className="text-sm font-bold text-foreground">{strategy.name}</CardTitle>
+                    <CardTitle className="text-sm font-semibold tracking-tight text-foreground">
+                      {strategy.name}
+                    </CardTitle>
                   </div>
-                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-up/10 text-up border border-up/20">
+                  <span className={cn("text-[10px] font-bold font-mono px-2 py-0.5 rounded border shrink-0", strategy.status === "ACTIVE" ? "bg-up/10 text-up border-up/20" : "bg-secondary text-muted-foreground border-border")}>
                     {strategy.status}
                   </span>
                 </div>
@@ -70,9 +81,9 @@ export default function StrategiesPage() {
                     <span>Score Impact</span>
                     <span className="font-mono text-up font-semibold">{strategy.contribution}</span>
                   </div>
-                  <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
+                  <div className="h-2 overflow-hidden rounded-full bg-secondary border border-border/80">
                     <div
-                      className="h-full rounded-full bg-primary"
+                      className="h-full rounded-full bg-primary shadow-[0_0_10px_rgba(59,130,246,0.4)]"
                       style={{ width: `${Number(strategy.score)}%` }}
                     />
                   </div>
@@ -85,4 +96,3 @@ export default function StrategiesPage() {
     </AppShell>
   );
 }
-

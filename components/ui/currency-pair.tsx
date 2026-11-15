@@ -31,15 +31,21 @@ export const CURRENCY_MAP: Record<string, CurrencyInfo> = {
 };
 
 export function parsePair(pairString: string) {
-  const clean = pairString.replace(/\s+/g, "").toUpperCase();
-  const parts = clean.split("/");
-  if (parts.length === 2) {
-    return { base: parts[0], quote: parts[1] };
+  if (!pairString) return { base: "EUR", quote: "USD" };
+  const stripped = pairString
+    .replace(/_otc/i, "")
+    .replace(/\(otc\)/i, "")
+    .replace(/otc/i, "")
+    .trim();
+  const parts = stripped.split(/[\/_]/);
+  if (parts.length === 2 && parts[0] && parts[1]) {
+    return { base: parts[0].toUpperCase(), quote: parts[1].toUpperCase() };
   }
-  if (clean.length === 6) {
+  const clean = stripped.replace(/[^a-zA-Z]/g, "").toUpperCase();
+  if (clean.length >= 6) {
     return { base: clean.slice(0, 3), quote: clean.slice(3, 6) };
   }
-  return { base: clean, quote: "USD" };
+  return { base: clean || "EUR", quote: "USD" };
 }
 
 interface DualFlagIconProps {

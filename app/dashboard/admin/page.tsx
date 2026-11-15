@@ -25,6 +25,7 @@ import {
   approveSubmission,
   generate30DayLicenseKey,
 } from "@/lib/auth-flow";
+import { cn } from "@/lib/utils";
 
 export default function AdminPage() {
   const [submissions, setSubmissions] = useState<PaymentSubmission[]>([]);
@@ -69,6 +70,12 @@ export default function AdminPage() {
     return true;
   });
 
+  const filterButtons = [
+    { key: "all", label: "All", count: submissions.length },
+    { key: "pending", label: "Pending", count: pendingCount },
+    { key: "approved", label: "Approved", count: approvedCount },
+  ] as const;
+
   return (
     <AppShell
       title="Admin Dashboard"
@@ -77,26 +84,40 @@ export default function AdminPage() {
       <div className="space-y-5">
         {/* Metric Cards */}
         <section className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-          <div className="p-4 rounded-xl bg-card border border-border">
-            <p className="text-xs text-muted-foreground font-medium">Pending Verifications</p>
+          <div className="p-4 rounded-xl bg-card border border-border shadow-sm">
+            <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">
+              Pending Verifications
+            </p>
             <p className="text-2xl font-bold font-mono text-warning mt-1">{pendingCount}</p>
             <p className="text-[10px] text-subtle mt-1">Awaiting Easypaisa audit</p>
           </div>
 
-          <div className="p-4 rounded-xl bg-card border border-border">
-            <p className="text-xs text-muted-foreground font-medium">Active 30-Day Licenses</p>
-            <p className="text-2xl font-bold font-mono text-up mt-1">{approvedCount + 1118}</p>
+          <div className="p-4 rounded-xl bg-card border border-border shadow-sm">
+            <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">
+              Active 30-Day Licenses
+            </p>
+            <p className="text-2xl font-bold font-mono text-up mt-1">
+              {approvedCount + 1118}
+            </p>
             <p className="text-[10px] text-subtle mt-1">Verified platform subscribers</p>
           </div>
 
-          <div className="p-4 rounded-xl bg-card border border-border">
-            <p className="text-xs text-muted-foreground font-medium">Easypaisa Account</p>
-            <p className="text-sm font-bold font-mono text-primary mt-1">{EASYPAISA_CONFIG.accountNumber}</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5 truncate">{EASYPAISA_CONFIG.accountTitle}</p>
+          <div className="p-4 rounded-xl bg-card border border-border shadow-sm">
+            <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">
+              Easypaisa Account
+            </p>
+            <p className="text-sm font-bold font-mono text-primary mt-1">
+              {EASYPAISA_CONFIG.accountNumber}
+            </p>
+            <p className="text-[10px] text-muted-foreground mt-0.5 truncate">
+              {EASYPAISA_CONFIG.accountTitle}
+            </p>
           </div>
 
-          <div className="p-4 rounded-xl bg-card border border-border">
-            <p className="text-xs text-muted-foreground font-medium">Fixed Period Policy</p>
+          <div className="p-4 rounded-xl bg-card border border-border shadow-sm">
+            <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">
+              Fixed Period Policy
+            </p>
             <p className="text-2xl font-bold font-mono text-foreground mt-1">30 Days</p>
             <p className="text-[10px] text-subtle mt-1">Strict expiry per license</p>
           </div>
@@ -104,11 +125,11 @@ export default function AdminPage() {
 
         {/* User Management and Verification Queue */}
         <section className="grid gap-5 xl:grid-cols-[1.5fr_0.9fr]">
-          <Card className="border-border bg-card">
+          <Card className={cn("border-border bg-card shadow-sm")}>
             <CardHeader className="pb-3 border-b border-border">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div>
-                  <CardTitle className="text-base text-foreground flex items-center gap-2">
+                  <CardTitle className="text-base font-semibold tracking-tight text-foreground flex items-center gap-2">
                     <CreditCard className="w-4 h-4 text-primary" />
                     Easypaisa Payment Verification Queue
                   </CardTitle>
@@ -118,36 +139,24 @@ export default function AdminPage() {
                 </div>
 
                 <div className="flex items-center gap-1.5 self-start sm:self-auto">
-                  <button
-                    onClick={() => setFilter("all")}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-mono transition-colors ${
-                      filter === "all"
-                        ? "bg-primary text-white"
-                        : "bg-secondary text-muted-foreground hover:text-foreground border border-border"
-                    }`}
-                  >
-                    All ({submissions.length})
-                  </button>
-                  <button
-                    onClick={() => setFilter("pending")}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-mono transition-colors ${
-                      filter === "pending"
-                        ? "bg-warning text-white"
-                        : "bg-secondary text-muted-foreground hover:text-foreground border border-border"
-                    }`}
-                  >
-                    Pending ({pendingCount})
-                  </button>
-                  <button
-                    onClick={() => setFilter("approved")}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-mono transition-colors ${
-                      filter === "approved"
-                        ? "bg-up text-white"
-                        : "bg-secondary text-muted-foreground hover:text-foreground border border-border"
-                    }`}
-                  >
-                    Approved ({approvedCount})
-                  </button>
+                  {filterButtons.map((fb) => (
+                    <button
+                      key={fb.key}
+                      onClick={() => setFilter(fb.key)}
+                      className={cn(
+                        "px-2.5 py-1 rounded-lg text-xs font-mono transition-colors whitespace-nowrap",
+                        filter === fb.key
+                          ? fb.key === "all"
+                            ? "bg-primary text-white"
+                            : fb.key === "pending"
+                              ? "bg-warning text-white"
+                              : "bg-up text-white"
+                          : "bg-secondary text-muted-foreground hover:text-foreground border border-border"
+                      )}
+                    >
+                      {fb.label} ({fb.count})
+                    </button>
+                  ))}
                 </div>
               </div>
             </CardHeader>
@@ -156,45 +165,56 @@ export default function AdminPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="border-b border-border text-subtle font-mono uppercase text-[10px]">
-                      <th className="pb-3">User / Sender</th>
-                      <th className="pb-3">Transaction ID (TID)</th>
-                      <th className="pb-3">Amount &amp; Pass</th>
-                      <th className="pb-3">Status / Key</th>
-                      <th className="pb-3 text-right">Action</th>
+                    <tr className="border-b border-border text-muted-foreground font-semibold uppercase text-[10px] tracking-wider bg-secondary/40">
+                      <th className="px-4 py-3">User / Sender</th>
+                      <th className="px-4 py-3">Transaction ID (TID)</th>
+                      <th className="px-4 py-3">Amount &amp; Pass</th>
+                      <th className="px-4 py-3">Status / Key</th>
+                      <th className="px-4 py-3 text-right">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
                     {filteredSubmissions.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="py-8 text-center text-muted-foreground font-mono">
-                          No submissions matching selected filter.
+                        <td colSpan={5} className="py-10 text-center text-xs text-muted-foreground font-mono">
+                          <div className="flex flex-col items-center gap-2">
+                            <Clock className="w-5 h-5 text-muted-foreground mx-auto mb-1" />
+                            <p>No submissions matching selected filter.</p>
+                          </div>
                         </td>
                       </tr>
                     ) : (
                       filteredSubmissions.map((sub) => (
-                        <tr key={sub.id} className="hover:bg-secondary/60 transition-colors">
-                          <td className="py-3">
+                        <tr
+                          key={sub.id}
+                          className="hover:bg-secondary/50 transition-colors group"
+                        >
+                          <td className="px-4 py-3">
                             <p className="font-semibold text-foreground">{sub.name}</p>
                             <p className="text-[11px] text-muted-foreground font-mono">{sub.email}</p>
                             <p className="text-[10px] text-subtle mt-0.5">
                               Sender: {sub.senderName} ({sub.senderPhone})
                             </p>
                           </td>
-                          <td className="py-3 font-mono">
-                            <span className="font-bold text-foreground bg-secondary px-2 py-1 rounded border border-border">
+                          <td className="px-4 py-3 font-mono">
+                            <span className={cn(
+                              "font-bold text-foreground bg-secondary px-2 py-1 rounded border border-border",
+                              "truncate max-w-[140px]"
+                            )}>
                               {sub.transactionId}
                             </span>
                             <p className="text-[10px] text-subtle mt-1">{sub.submittedAt}</p>
                           </td>
-                          <td className="py-3">
+                          <td className="px-4 py-3">
                             <span className="font-bold font-mono text-foreground">{sub.amount}</span>
                             <p className="text-[10px] text-up font-mono">30 Days Fixed</p>
                           </td>
-                          <td className="py-3">
+                          <td className="px-4 py-3">
                             {sub.status === "approved" ? (
                               <div className="space-y-1">
-                                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-up/10 text-up border border-up/20 inline-block">
+                                <span className={cn(
+                                  "text-[10px] font-bold font-mono px-2 py-0.5 rounded border bg-up/10 text-up border-up/20 inline-block"
+                                )}>
                                   VERIFIED
                                 </span>
                                 {sub.licenseKey && (
@@ -215,12 +235,14 @@ export default function AdminPage() {
                                 )}
                               </div>
                             ) : (
-                              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-warning/10 text-warning border border-warning/20 inline-block">
+                              <span className={cn(
+                                "text-[10px] font-bold font-mono px-2 py-0.5 rounded border bg-warning/10 text-warning border-warning/20 inline-block"
+                              )}>
                                 PENDING REVIEW
                               </span>
                             )}
                           </td>
-                          <td className="py-3 text-right">
+                          <td className="px-4 py-3 text-right">
                             {sub.status === "pending" ? (
                               <button
                                 onClick={() => handleApprove(sub.id)}
@@ -247,9 +269,9 @@ export default function AdminPage() {
           {/* Operational Checks & Manual License Issuer */}
           <div className="space-y-5">
             {/* Quick License Generator */}
-            <Card className="border-border bg-card">
+            <Card className={cn("border-border bg-card shadow-sm")}>
               <CardHeader className="pb-3 border-b border-border">
-                <CardTitle className="text-base text-foreground flex items-center gap-2">
+                <CardTitle className="text-base font-semibold tracking-tight text-foreground flex items-center gap-2">
                   <KeyRound className="w-4 h-4 text-primary" />
                   Instant 30-Day License Generator
                 </CardTitle>
@@ -259,18 +281,23 @@ export default function AdminPage() {
               </CardHeader>
               <CardContent className="space-y-3 pt-4 text-xs">
                 <p className="text-muted-foreground text-xs leading-relaxed">
-                  Generated keys grant precisely 30 days of platform access from the time the user enters them in Step 4 or on the License page.
+                  Generated keys grant precisely 30 days of platform access from the time the user enters them in Step 4
+                  or on the License page.
                 </p>
 
                 {quickKeyGenerated && (
-                  <div className="p-3 rounded-lg bg-secondary border border-border flex items-center justify-between">
+                  <div className="p-3 rounded-lg bg-secondary border border-border flex items-center justify-between shadow-sm">
                     <div>
-                      <p className="text-[10px] text-muted-foreground uppercase font-mono">Issued 30-Day Key</p>
-                      <p className="text-xs font-bold font-mono text-primary mt-0.5">{quickKeyGenerated}</p>
+                      <p className="text-[10px] text-muted-foreground uppercase font-mono">
+                        Issued 30-Day Key
+                      </p>
+                      <p className="text-xs font-bold font-mono text-primary mt-0.5 truncate">
+                        {quickKeyGenerated}
+                      </p>
                     </div>
                     <button
                       onClick={() => copyToClipboard(quickKeyGenerated, "manual-gen")}
-                      className="p-1.5 rounded bg-card hover:bg-secondary text-subtle hover:text-foreground"
+                      className="p-1.5 rounded bg-card hover:bg-secondary text-subtle hover:text-foreground transition-colors"
                       title="Copy Key"
                     >
                       {copiedKey === "manual-gen" ? (
@@ -293,27 +320,27 @@ export default function AdminPage() {
             </Card>
 
             {/* Easypaisa Official Configuration Card */}
-            <Card className="border-border bg-card">
+            <Card className={cn("border-border bg-card shadow-sm")}>
               <CardHeader className="pb-3 border-b border-border">
-                <CardTitle className="text-base text-foreground flex items-center gap-2">
+                <CardTitle className="text-base font-semibold tracking-tight text-foreground flex items-center gap-2">
                   <CreditCard className="w-4 h-4 text-up" />
                   Easypaisa Gateway Details
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2.5 pt-4 text-xs font-mono">
-                <div className="p-2.5 rounded-lg bg-secondary border border-border flex justify-between">
+                <div className="p-2.5 rounded-lg bg-secondary border border-border flex justify-between shadow-sm">
                   <span className="text-muted-foreground">Title:</span>
                   <span className="font-semibold text-foreground">{EASYPAISA_CONFIG.accountTitle}</span>
                 </div>
-                <div className="p-2.5 rounded-lg bg-secondary border border-border flex justify-between">
+                <div className="p-2.5 rounded-lg bg-secondary border border-border flex justify-between shadow-sm">
                   <span className="text-muted-foreground">Account:</span>
                   <span className="font-bold text-primary">{EASYPAISA_CONFIG.accountNumber}</span>
                 </div>
-                <div className="p-2.5 rounded-lg bg-secondary border border-border flex justify-between">
+                <div className="p-2.5 rounded-lg bg-secondary border border-border flex justify-between shadow-sm">
                   <span className="text-muted-foreground">Duration:</span>
                   <span className="text-up font-bold">30 Days Fixed</span>
                 </div>
-                <div className="p-2.5 rounded-lg bg-secondary border border-border flex justify-between">
+                <div className="p-2.5 rounded-lg bg-secondary border border-border flex justify-between shadow-sm">
                   <span className="text-muted-foreground">SLA:</span>
                   <span className="text-foreground">&lt; 30 Minutes</span>
                 </div>

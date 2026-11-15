@@ -22,6 +22,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 
 export function ExtensionCTA() {
   const [copied, setCopied] = useState(false);
@@ -37,50 +38,52 @@ export function ExtensionCTA() {
     {
       num: "01",
       title: "Download & Extract Zip",
-      desc: "Download the extension zip package using the button above and extract it to a permanent folder (e.g. Downloads/apex-trading-extension).",
+      desc: "Download the extension zip package using the button above and extract it to a permanent folder.",
     },
     {
       num: "02",
-      title: "Open Extensions in Google Chrome",
-      desc: "Open Google Chrome and navigate to the extensions management screen by entering this URL in your browser address bar:",
+      title: "Open Extensions in Chrome",
+      desc: "Navigate to chrome://extensions in your browser address bar.",
       action: "copy",
     },
     {
       num: "03",
       title: "Enable Developer Mode",
-      desc: "Look at the top-right corner of the Chrome Extensions page and turn ON the toggle switch labeled 'Developer mode'.",
+      desc: "Turn ON the toggle switch labeled 'Developer mode' in the top-right corner.",
     },
     {
       num: "04",
       title: "Click 'Load Unpacked'",
-      desc: "In the top-left toolbar, click the 'Load unpacked' button, then select your extracted apex-trading-extension folder.",
+      desc: "Select your extracted apex-trading-extension folder.",
     },
     {
       num: "05",
       title: "Pin & Start Monitoring",
-      desc: "Pin the Apex icon to your Chrome toolbar. Open your broker tab (Pocket Option, Quotex, etc.) — the extension will automatically detect the active pair and OTC status.",
+      desc: "Pin the Apex icon. Open your broker tab — the extension will auto-detect the active pair.",
     },
   ];
 
   return (
     <>
-      <div className="rounded-xl bg-card border border-border p-5 hover:border-primary/40 transition-colors">
+      <div className="rounded-xl bg-card border border-border p-5 hover:border-primary/40 transition-colors shadow-sm">
         <div className="flex items-start gap-3">
           <div className="p-2.5 rounded-lg bg-primary/10 border border-primary/20 shrink-0 text-primary">
             <Globe className="w-5 h-5" />
           </div>
           <div className="flex-1">
             <div className="flex items-center justify-between gap-2">
-              <p className="text-sm font-semibold text-foreground">Link Chrome Extension</p>
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-secondary text-muted-foreground border border-border">
+              <p className="text-sm font-semibold tracking-tight text-foreground">
+                Link Chrome Extension
+              </p>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-secondary text-muted-foreground border border-border">
                 v1.0.0
               </span>
             </div>
-            <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+            <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
               Automatic pair sync requires the Apex extension. It detects OTC vs Regular market and notifies the engine.
             </p>
 
-            <div className="mt-3.5 flex flex-wrap items-center gap-3">
+            <div className="mt-4 flex flex-wrap items-center gap-3">
               <button
                 type="button"
                 onClick={() => setIsOpen(true)}
@@ -106,18 +109,17 @@ export function ExtensionCTA() {
         </div>
       </div>
 
-      {/* Shadcn Dialog Modal */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="sm:max-w-xl max-h-[88vh] overflow-y-auto p-5 sm:p-6 bg-card border-border text-foreground">
-          <DialogHeader className="gap-1.5 pb-2 border-b border-border">
+        <DialogContent className="sm:max-w-xl max-h-[88vh] overflow-y-auto p-5 sm:p-6 bg-card border-border">
+          <DialogHeader className="gap-1.5 pb-3 border-b border-border">
             <div className="flex items-center gap-2">
               <div className="p-1.5 rounded-lg bg-primary/10 border border-primary/20 text-primary">
                 <Globe className="w-4 h-4" />
               </div>
-              <DialogTitle className="text-base font-semibold text-foreground">
+              <DialogTitle className="text-base font-semibold tracking-tight text-foreground">
                 Apex Chrome Extension Setup
               </DialogTitle>
-              <span className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-primary/10 text-primary border border-primary/20">
+              <span className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-primary/10 text-primary border border-primary/20">
                 Manifest V3
               </span>
             </div>
@@ -126,7 +128,6 @@ export function ExtensionCTA() {
             </DialogDescription>
           </DialogHeader>
 
-          {/* Direct Download Card */}
           <div className="p-4 rounded-xl bg-primary/5 border border-primary/25 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className="p-2.5 rounded-lg bg-primary/15 border border-primary/30 text-primary shrink-0">
@@ -137,8 +138,8 @@ export function ExtensionCTA() {
                   apex-trading-extension.zip
                   <span className="text-[10px] font-mono text-muted-foreground">v1.0.0</span>
                 </p>
-                <p className="text-[11px] text-muted-foreground">
-                  Official extension archive · Size: ~286 KB · Manifest V3
+                <p className="text-[10px] text-muted-foreground">
+                  Official extension archive · Manifest V3
                 </p>
               </div>
             </div>
@@ -153,7 +154,6 @@ export function ExtensionCTA() {
             </a>
           </div>
 
-          {/* Installation Steps */}
           <div className="space-y-3 pt-1">
             <div className="flex items-center justify-between">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono">
@@ -164,16 +164,13 @@ export function ExtensionCTA() {
 
             <div className="space-y-2.5">
               {steps.map((step) => (
-                <div
-                  key={step.num}
-                  className="p-3 rounded-lg bg-secondary/50 border border-border/80 flex items-start gap-3 text-xs"
-                >
-                  <span className="font-mono font-bold text-xs text-primary px-1.5 py-0.5 rounded bg-primary/10 border border-primary/20 shrink-0 mt-0.5">
+                <div key={step.num} className="p-3 rounded-lg bg-secondary/50 border border-border/60 flex items-start gap-3 text-xs">
+                  <span className={cn("font-mono font-bold text-xs px-1.5 py-0.5 rounded bg-primary/10 border border-primary/20 shrink-0 mt-0.5", "text-primary")}>
                     {step.num}
                   </span>
                   <div className="flex-1 space-y-1">
                     <p className="font-semibold text-foreground">{step.title}</p>
-                    <p className="text-muted-foreground text-[11px] leading-relaxed">{step.desc}</p>
+                    <p className="text-muted-foreground text-[10px] leading-relaxed">{step.desc}</p>
 
                     {step.action === "copy" && (
                       <div className="mt-2 flex items-center gap-2">
@@ -183,7 +180,7 @@ export function ExtensionCTA() {
                         <button
                           type="button"
                           onClick={handleCopyChromeUrl}
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded border border-border hover:bg-background text-[11px] font-semibold text-foreground transition-colors cursor-pointer"
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded border border-border hover:bg-background text-[11px] font-bold text-foreground transition-colors cursor-pointer"
                         >
                           {copied ? (
                             <>
@@ -205,15 +202,14 @@ export function ExtensionCTA() {
             </div>
           </div>
 
-          {/* Regulatory & Safety Notice */}
-          <div className="p-3 rounded-lg bg-secondary/30 border border-border/60 flex items-start gap-2.5 text-[11px] text-muted-foreground leading-relaxed">
+          <div className="p-3.5 rounded-lg bg-secondary/30 border border-border/60 flex items-start gap-2.5 text-[10px] text-muted-foreground leading-relaxed">
             <ShieldCheck className="w-4 h-4 text-primary shrink-0 mt-0.5" />
             <div>
-              <strong className="text-foreground">Non-Custodial & Safe:</strong> The Apex extension only reads the active chart ticker name and OTC mode to sync telemetry with your decision engine. It never accesses broker account passwords, funds, or trade execution.
+              <strong className="text-foreground">Non-Custodial & Safe:</strong>
+              The Apex extension only reads the active chart ticker name and OTC mode to sync telemetry with your decision engine. It never accesses broker account passwords, funds, or trade execution.
             </div>
           </div>
 
-          {/* Modal Footer */}
           <div className="pt-2 border-t border-border flex items-center justify-between gap-3">
             <Link
               href="/dashboard/help"
@@ -227,7 +223,7 @@ export function ExtensionCTA() {
             <button
               type="button"
               onClick={() => setIsOpen(false)}
-              className="px-3.5 py-1.5 rounded-lg border border-border bg-secondary hover:bg-secondary/80 text-foreground text-xs font-semibold transition-colors cursor-pointer"
+              className="px-3.5 py-1.5 rounded-lg border border-border bg-secondary hover:bg-secondary/80 text-foreground text-xs font-bold transition-colors cursor-pointer"
             >
               Done
             </button>

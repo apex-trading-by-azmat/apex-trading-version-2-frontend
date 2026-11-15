@@ -15,6 +15,14 @@ const nextConfig: NextConfig = {
       },
     },
   },
+  async rewrites() {
+    return [
+      {
+        source: "/api/proxy/:path*",
+        destination: "https://apex-api.udyanasoft.com:8001/:path*",
+      },
+    ];
+  },
 };
 
 export default nextConfig;

@@ -24,6 +24,7 @@ import {
   activateLicenseKey,
   ActiveLicense,
 } from "@/lib/auth-flow";
+import { cn } from "@/lib/utils";
 
 export default function LicensePage() {
   const [license, setLicense] = useState<ActiveLicense | null>(null);
@@ -79,14 +80,18 @@ export default function LicensePage() {
       <div className="space-y-5">
         <div className="grid gap-5 md:grid-cols-[1.3fr_1.1fr]">
           {/* Active Pass Card */}
-          <Card className="border-border bg-card">
+          <Card className={cn("border-border bg-card shadow-sm", "border-border")}>
             <CardHeader className="pb-3 border-b border-border">
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="text-base text-foreground">Active Subscription Pass</CardTitle>
-                  <CardDescription className="text-xs text-muted-foreground">Single 30-day fixed period access</CardDescription>
+                  <CardTitle className="text-base font-semibold tracking-tight text-foreground">
+                    Active Subscription Pass
+                  </CardTitle>
+                  <CardDescription className="text-xs text-muted-foreground">
+                    Single 30-day fixed period access
+                  </CardDescription>
                 </div>
-                <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-up/10 text-up border border-up/20">
+                <span className={cn("text-[11px] font-bold font-mono px-2 py-0.5 rounded border", daysRemaining > 0 ? "bg-up/10 text-up border-up/20" : "bg-down/10 text-down border-down/20")}>
                   {daysRemaining > 0 ? "ACTIVE" : "EXPIRED"}
                 </span>
               </div>
@@ -94,7 +99,7 @@ export default function LicensePage() {
             <CardContent className="space-y-4 pt-4">
               <div className="flex items-baseline justify-between">
                 <div>
-                  <h3 className="text-2xl font-bold text-foreground">30-Day Signal Pass</h3>
+                  <h3 className="text-2xl font-bold tracking-tight text-foreground">30-Day Signal Pass</h3>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     Activated on {license?.activatedAt || "2026-11-11"}
                   </p>
@@ -111,8 +116,8 @@ export default function LicensePage() {
                   <span>30-Day Cycle Consumption</span>
                   <span>{30 - daysRemaining} / 30 Days ({progressPercent}%)</span>
                 </div>
-                <div className="h-2 rounded-full bg-secondary overflow-hidden">
-                  <div className="h-full rounded-full bg-primary transition-all duration-500" style={{ width: `${progressPercent}%` }} />
+                <div className="h-2 rounded-full bg-secondary overflow-hidden border border-border/60">
+                  <div className="h-full rounded-full bg-primary transition-all duration-500 shadow-[0_0_10px_rgba(59,130,246,0.4)]" style={{ width: `${progressPercent}%` }} />
                 </div>
               </div>
 
@@ -129,14 +134,14 @@ export default function LicensePage() {
                 </div>
               </div>
 
-              <div className="p-3 rounded-lg bg-secondary/60 border border-border flex items-center justify-between text-xs font-mono">
+              <div className="p-3 rounded-lg bg-secondary/60 border border-border flex items-center justify-between text-xs font-mono shadow-sm">
                 <div>
                   <span className="text-muted-foreground text-[10px] block">CURRENT LICENSE KEY:</span>
                   <span className="font-bold text-primary">{license?.key || "APEX-30D-AZMT-9900-V1"}</span>
                 </div>
                 <button
                   onClick={() => copyToClipboard(license?.key || "APEX-30D-AZMT-9900-V1", "active-key")}
-                  className="p-1 rounded hover:bg-secondary text-subtle hover:text-foreground"
+                  className="p-1 rounded hover:bg-secondary text-subtle hover:text-foreground transition-colors"
                   title="Copy Key"
                 >
                   {copiedField === "active-key" ? <Check className="w-3.5 h-3.5 text-up" /> : <Copy className="w-3.5 h-3.5" />}
@@ -146,9 +151,9 @@ export default function LicensePage() {
           </Card>
 
           {/* Renewal & Payment Policy */}
-          <Card className="border-border bg-card flex flex-col justify-between">
+          <Card className={cn("border-border bg-card shadow-sm flex flex-col justify-between")}>
             <CardHeader className="pb-3 border-b border-border">
-              <CardTitle className="text-base text-foreground flex items-center gap-2">
+              <CardTitle className="text-base font-semibold tracking-tight text-foreground flex items-center gap-2">
                 <CreditCard className="w-4 h-4 text-primary" />
                 Easypaisa Official Deposit Account
               </CardTitle>
@@ -157,32 +162,32 @@ export default function LicensePage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 pt-4">
-              <div className="p-3 rounded-lg bg-secondary border border-border text-xs text-muted-foreground leading-relaxed">
+              <div className="p-3 rounded-lg bg-secondary border border-border text-xs text-muted-foreground leading-relaxed shadow-sm">
                 Apex Signal Trading operates on a single 30-day fixed model with zero recurring auto-debits. Renewals are handled via manual Easypaisa transaction ID submission verified by administrators.
               </div>
 
               <div className="space-y-2.5 text-xs font-mono">
-                <div className="flex items-center justify-between p-2.5 rounded-lg bg-secondary border border-border">
+                <div className="flex items-center justify-between p-2.5 rounded-lg bg-secondary border border-border shadow-sm">
                   <div>
                     <span className="text-[10px] text-muted-foreground block">ACCOUNT TITLE</span>
                     <span className="font-bold text-foreground">{EASYPAISA_CONFIG.accountTitle}</span>
                   </div>
                   <button
                     onClick={() => copyToClipboard(EASYPAISA_CONFIG.accountTitle, "acc-title")}
-                    className="p-1 rounded hover:bg-card text-subtle hover:text-foreground"
+                    className="p-1 rounded hover:bg-card text-subtle hover:text-foreground transition-colors"
                   >
                     {copiedField === "acc-title" ? <Check className="w-3.5 h-3.5 text-up" /> : <Copy className="w-3.5 h-3.5" />}
                   </button>
                 </div>
 
-                <div className="flex items-center justify-between p-2.5 rounded-lg bg-secondary border border-border">
+                <div className="flex items-center justify-between p-2.5 rounded-lg bg-secondary border border-border shadow-sm">
                   <div>
                     <span className="text-[10px] text-muted-foreground block">EASYPAISA NUMBER</span>
                     <span className="font-bold text-primary">{EASYPAISA_CONFIG.accountNumber}</span>
                   </div>
                   <button
                     onClick={() => copyToClipboard(EASYPAISA_CONFIG.accountNumber, "acc-num")}
-                    className="p-1 rounded hover:bg-card text-subtle hover:text-foreground"
+                    className="p-1 rounded hover:bg-card text-subtle hover:text-foreground transition-colors"
                   >
                     {copiedField === "acc-num" ? <Check className="w-3.5 h-3.5 text-up" /> : <Copy className="w-3.5 h-3.5" />}
                   </button>
@@ -205,23 +210,19 @@ export default function LicensePage() {
                     value={keyInput}
                     onChange={(e) => setKeyInput(e.target.value.toUpperCase())}
                     placeholder="e.g. APEX-30D-XXXX-XXXX"
-                    className="flex-1 px-3 py-2 rounded-lg bg-secondary border border-border text-xs font-mono font-semibold text-foreground focus:outline-none focus:border-primary uppercase"
+                    className="flex-1 px-3 py-2 rounded-lg bg-secondary border border-border text-xs font-mono font-semibold text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary uppercase"
                   />
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="px-4 py-2 rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-semibold whitespace-nowrap transition-colors shadow-sm disabled:opacity-50"
+                    className="px-4 py-2 rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-semibold whitespace-nowrap transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isSubmitting ? <RefreshCw className="w-4 h-4 animate-spin" /> : "Apply Key"}
                   </button>
                 </div>
 
                 {statusMessage && (
-                  <p
-                    className={`text-xs flex items-center gap-1.5 ${
-                      statusMessage.isError ? "text-down" : "text-up"
-                    }`}
-                  >
+                  <p className={cn("text-xs flex items-center gap-1.5", statusMessage.isError ? "text-down" : "text-up")}>
                     {statusMessage.isError ? (
                       <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                     ) : (
