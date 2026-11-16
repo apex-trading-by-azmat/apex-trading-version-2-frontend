@@ -49,12 +49,14 @@ export function useSignalsWebSocket() {
   const buildWsUrl = useCallback(() => {
     const token = getToken();
     if (!token) return null;
-    const protocol =
-      typeof window !== "undefined" && window.location.protocol === "https:"
-        ? "wss:"
-        : "ws:";
-    const host = window.location.host;
-    return `${protocol}//${host}:8000/ws/signals?token=${encodeURIComponent(token)}`;
+    const apiUrl =
+      process.env.NEXT_PUBLIC_API_URL ||
+      (typeof window !== "undefined"
+        ? `${window.location.protocol}//${window.location.hostname}:8000`
+        : "http://localhost:8000");
+
+    const wsBase = apiUrl.replace(/^http:/, "ws:").replace(/^https:/, "wss:");
+    return `${wsBase}/ws/signals?token=${encodeURIComponent(token)}`;
   }, [getToken]);
 
   const connect = useCallback(() => {

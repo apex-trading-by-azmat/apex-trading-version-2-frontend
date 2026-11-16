@@ -557,6 +557,20 @@ export default function LiveSignalsPage() {
   // Determine if the newest backend signal belongs to the CURRENT 60-second candle
   const latestBackendSignal = signalsList.length > 0 ? signalsList[0] : null;
 
+  // Check if a qualified signal was generated for the active 60s candle window (under 65s age)
+  const isSignalStillActiveCandle = useCallback(
+    (sig: SignalData | null): boolean => {
+      if (!sig || !sig.created_at || !nowDate) return false;
+      const sigTime = parseSignalTime(sig.created_at);
+      if (!sigTime) return false;
+      const nowMs = nowDate.getTime();
+      const ageSeconds = (nowMs - sigTime) / 1000;
+      // In 60s binary trading, a signal is active for the full 60 seconds of that candle (with 5s buffer)
+      return ageSeconds >= 0 && ageSeconds < 65;
+    },
+    [nowDate, parseSignalTime],
+  );
+
   // Check if a backend signal represents a WAIT/STANDBY state
   const isBackendSignalWait = useCallback((sig: SignalData | null): boolean => {
     if (!sig) return true;
@@ -574,35 +588,49 @@ export default function LiveSignalsPage() {
     return false;
   }, []);
 
-  // Dynamic Active Signal directly driven by backend telemetry:
-  // 1. REST API signalsList (polled every 1s) takes priority — it is the source of truth for current backend state.
-  //    If the most recent backend signal is WAIT/standby, show the waiting screen regardless of stale WebSocket state.
-  // 2. WebSocket real-time signal (signal/qualified or signal/wait) — only when REST has no data.
-  // 3. User's explicit selection only when no backend signal conflicts.
-  // 4. Standby WAIT state when nothing is available.
-  // Dynamic Active Signal — WebSocket real-time events take absolute priority over REST polling.
-  // 1. WebSocket signal/wait — backend is telling us the current state is WAIT, show WAIT screen.
-  // 2. WebSocket signal/qualified — real-time UP/DOWN signal from backend.
-  // 3. REST API signalsList — fallback polling (only when WebSocket has no current signal).
-  // 4. User's explicit selection — only when no backend signal conflicts.
-  // 5. Default standby WAIT state when nothing is available.
+  // Dynamic Active Signal:
+  // 1. User manual inspection (clicking a specific pair/historical signal) takes immediate priority.
+  // 2. Real-time qualified signal from WebSocket or REST that belongs to the current 60s candle:
+  //    MUST stay displayed for the ENTIRE 60 seconds (seconds 00-30: Open, seconds 30-59: Locked/Expiring).
+  //    It should NEVER be prematurely cleared into WAIT at 30s while the trade is still running!
+  // 3. If no active qualified signal exists for the current candle:
+  //    Display dynamic WAIT/Standby state for the monitored pair.
   const activeSignal: SignalData = useMemo(() => {
-    // ── 1. WebSocket signal/wait — absolute priority: backend says WAIT ──
+    // ── 1. User's explicit inspection from slider or table ──
+    if (selectedSignalId) {
+      const found = displaySignals.find((s) => s.id === selectedSignalId);
+      if (found) return found;
+    }
+
+    // ── 2. Check for active qualified signal in the current candle from WebSocket ──
+    if (
+      wsActiveSignal &&
+      wsActiveSignal.is_qualified &&
+      (wsActiveSignal.direction === "UP" || wsActiveSignal.direction === "DOWN")
+    ) {
+      return wsActiveSignal;
+    }
+
+    // ── 3. Check for active qualified signal in the current candle from REST polling ──
+    if (
+      latestBackendSignal &&
+      !isBackendSignalWait(latestBackendSignal) &&
+      isSignalStillActiveCandle(latestBackendSignal)
+    ) {
+      return latestBackendSignal;
+    }
+
+    // ── 4. If WebSocket explicitly sent a WAIT signal with live telemetry, use its asset info ──
     if (
       wsActiveSignal &&
       (wsActiveSignal.direction === "WAIT" ||
         (wsActiveSignal.direction as string) === "STANDBY" ||
-        wsActiveSignal.is_qualified === false ||
-        (wsActiveSignal.status_code &&
-          (wsActiveSignal.status_code.toUpperCase().includes("WAIT") ||
-            wsActiveSignal.status_code.toUpperCase().includes("STANDBY") ||
-            wsActiveSignal.status_code.toUpperCase().includes("NO_SETUP"))))
+        wsActiveSignal.is_qualified === false)
     ) {
       return {
         ...wsActiveSignal,
         direction: "WAIT",
-        status_code:
-          wsActiveSignal.status_code || "WAITING_FOR_SETUP",
+        status_code: wsActiveSignal.status_code || "WAITING_FOR_SETUP",
         is_qualified: false,
         confidence_score: wsActiveSignal.confidence_score ?? 0,
         consensus_count: wsActiveSignal.consensus_count ?? 0,
@@ -615,40 +643,20 @@ export default function LiveSignalsPage() {
       };
     }
 
-    // ── 2. WebSocket signal/qualified — real-time UP/DOWN signal ──
-    if (wsActiveSignal) {
-      return wsActiveSignal;
+    // ── 5. REST API latest signal is WAIT/standby ──
+    if (latestBackendSignal && isBackendSignalWait(latestBackendSignal)) {
+      return {
+        ...latestBackendSignal,
+        direction: "WAIT",
+        status_code: latestBackendSignal.status_code || "WAITING_FOR_SETUP",
+        is_qualified: false,
+        confidence_score: latestBackendSignal.confidence_score ?? 0,
+        consensus_count: latestBackendSignal.consensus_count ?? 0,
+        votes: latestBackendSignal.votes || WAIT_SIGNAL.votes,
+      };
     }
 
-    // ── 3. REST API fallback — source of truth when WebSocket is silent ──
-    if (latestBackendSignal) {
-      if (isBackendSignalWait(latestBackendSignal)) {
-        return {
-          ...latestBackendSignal,
-          direction: "WAIT",
-          status_code:
-            latestBackendSignal.status_code || "WAITING_FOR_SETUP",
-          is_qualified: false,
-          confidence_score: latestBackendSignal.confidence_score ?? 0,
-          consensus_count: latestBackendSignal.consensus_count ?? 0,
-          votes: latestBackendSignal.votes || WAIT_SIGNAL.votes,
-        };
-      }
-      // Backend returned an actionable UP/DOWN signal.
-      if (selectedSignalId) {
-        const found = displaySignals.find((s) => s.id === selectedSignalId);
-        if (found) return found;
-      }
-      return latestBackendSignal;
-    }
-
-    // ── 4. No backend signal: honor explicit user selection ──
-    if (selectedSignalId) {
-      const found = displaySignals.find((s) => s.id === selectedSignalId);
-      if (found) return found;
-    }
-
-    // ── 5. Default dynamic WAITING STATE for the monitored pair ──
+    // ── 6. Default dynamic WAITING STATE for the monitored pair ──
     const monitoredAsset = displaySignals[0]?.asset || "EURUSD_OTC";
     const monitoredPayout = displaySignals[0]?.broker_payout || undefined;
 
@@ -664,6 +672,7 @@ export default function LiveSignalsPage() {
     displaySignals,
     latestBackendSignal,
     isBackendSignalWait,
+    isSignalStillActiveCandle,
     nowDate,
     wsActiveSignal,
   ]);
@@ -1045,8 +1054,10 @@ export default function LiveSignalsPage() {
                 >
                   {isWait
                     ? "STANDBY STATE"
-                    : activeSignal.status_code?.replace(/_/g, " ") ||
-                      "QUALIFIED SIGNAL"}
+                    : !isWindowOpen
+                      ? "IN-TRADE EXPIRY PHASE"
+                      : activeSignal.status_code?.replace(/_/g, " ") ||
+                        "QUALIFIED SIGNAL"}
                 </span>
 
                 <span className="text-xs font-mono text-primary bg-primary/10 border border-primary/20 px-3 py-1.5 rounded-lg">
@@ -1121,11 +1132,15 @@ export default function LiveSignalsPage() {
                     )}
                   >
                     ACTION:{" "}
-                    {isUp
-                      ? "CALL / HIGHER (BUY)"
-                      : isDown
-                        ? "PUT / LOWER (SELL)"
-                        : "WAIT / NO TRADE"}
+                    {isWait
+                      ? "WAIT / NO TRADE"
+                      : isWindowOpen
+                        ? isUp
+                          ? "CALL / HIGHER (BUY)"
+                          : "PUT / LOWER (SELL)"
+                        : isUp
+                          ? "CALL IN PROGRESS (Awaiting :00 Expiry)"
+                          : "PUT IN PROGRESS (Awaiting :00 Expiry)"}
                   </p>
                 </div>
               </div>
