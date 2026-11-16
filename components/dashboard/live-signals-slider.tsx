@@ -436,7 +436,7 @@ export function LiveSignalsSlider({
                   {/* Row 3: Broker Payout + Consensus + Time (UTC+5) */}
                   <div className="flex items-center justify-between text-[10px] font-mono text-muted-foreground pt-1 border-t border-border/50">
                     <span className="text-up font-semibold">
-                      {sig.broker_payout || 83}% Payout
+                      {sig.broker_payout ? `${sig.broker_payout}% Payout` : "—% Payout"}
                     </span>
                     <span className="text-subtle">
                       {isSigWait ? "Monitoring" : `${sig.consensus_count || 2}/3 Agree`}

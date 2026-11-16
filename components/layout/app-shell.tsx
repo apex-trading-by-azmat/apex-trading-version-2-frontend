@@ -107,11 +107,63 @@ export function AppShell({
     full_name?: string;
   } | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
+  const [extensionConnected, setExtensionConnected] = useState(false);
+  const [monitoringActive, setMonitoringActive] = useState(false);
 
   // Session from /auth/session — source of truth for session_id
   const { session, loading: sessionLoading } = useSession();
 
   const sessionId = session?.session_id ?? null;
+
+  // Dynamic extension connection status from localStorage + custom events
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const checkExtension = () => {
+      const sid =
+        localStorage.getItem("apex_session_id") ||
+        localStorage.getItem("session_id") ||
+        null;
+      setExtensionConnected(!!sid && !!sessionId);
+      setMonitoringActive(!!sid);
+    };
+
+    checkExtension();
+
+    const handleExtConnect = () => {
+      setExtensionConnected(true);
+      setMonitoringActive(true);
+    };
+    const handleExtDisconnect = () => {
+      setExtensionConnected(false);
+      setMonitoringActive(false);
+    };
+
+    window.addEventListener("apex_extension_connected", handleExtConnect);
+    window.addEventListener("apex_extension_disconnected", handleExtDisconnect);
+    window.addEventListener("apex_monitoring_started", () =>
+      setMonitoringActive(true),
+    );
+    window.addEventListener("apex_monitoring_stopped", () =>
+      setMonitoringActive(false),
+    );
+
+    return () => {
+      window.removeEventListener("apex_extension_connected", handleExtConnect);
+      window.removeEventListener(
+        "apex_extension_disconnected",
+        handleExtDisconnect,
+      );
+      window.removeEventListener(
+        "apex_monitoring_started",
+        () => setMonitoringActive(true),
+      );
+      window.removeEventListener(
+        "apex_monitoring_stopped",
+        () => setMonitoringActive(false),
+      );
+    };
+  }, [sessionId]);
 
   useEffect(() => {
     // Wait for session to load before checking auth state
@@ -232,15 +284,36 @@ export function AppShell({
         </div>
 
         {/* Engine Status Strip */}
-        <div className="mx-4 mt-4 px-3 py-2.5 rounded-lg bg-secondary border border-border flex items-center justify-between gap-3">
+        <div
+          className={cn(
+            "mx-4 mt-4 px-3 py-2.5 rounded-lg border flex items-center justify-between gap-3 transition-colors",
+            monitoringActive
+              ? "bg-up/10 border-up/20"
+              : "bg-secondary border-border",
+          )}
+        >
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            <StatusDot status="offline" />
-            <span className="text-[11px] font-medium text-muted-foreground truncate">
+            <StatusDot
+              status={monitoringActive ? "online" : "offline"}
+            />
+            <span
+              className={cn(
+                "text-[11px] font-medium truncate",
+                monitoringActive ? "text-up" : "text-muted-foreground",
+              )}
+            >
               Decision Engine
             </span>
           </div>
-          <span className="text-[10px] font-mono font-semibold uppercase tracking-wider text-subtle border border-border rounded px-1.5 py-0.5">
-            standby
+          <span
+            className={cn(
+              "text-[10px] font-mono font-semibold uppercase tracking-wider border rounded px-1.5 py-0.5",
+              monitoringActive
+                ? "bg-up/10 text-up border-up/20"
+                : "text-subtle border-border",
+            )}
+          >
+            {monitoringActive ? "ACTIVE" : "STANDBY"}
           </span>
         </div>
 
@@ -386,15 +459,35 @@ export function AppShell({
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="hidden sm:flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-secondary border border-border text-xs text-muted-foreground font-medium">
-              <StatusDot status="offline" />
+            <div
+              className={cn(
+                "hidden sm:flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-all",
+                monitoringActive
+                  ? "bg-up/10 border-up/20 text-up"
+                  : "bg-secondary border-border text-muted-foreground",
+              )}
+            >
+              <StatusDot status={monitoringActive ? "online" : "offline"} />
               <span>Monitoring</span>
-              <span className="font-mono text-subtle">OFF</span>
+              <span className="font-mono">
+                {monitoringActive ? "ACTIVE" : "OFF"}
+              </span>
             </div>
 
-            <div className="hidden md:flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-down/8 border border-down/20 text-xs text-down font-medium">
-              <StatusDot status="offline" />
-              <span>Extension Disconnected</span>
+            <div
+              className={cn(
+                "hidden md:flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-all",
+                extensionConnected
+                  ? "bg-up/10 border-up/20 text-up"
+                  : "bg-down/8 border-down/20 text-down",
+              )}
+            >
+              <StatusDot status={extensionConnected ? "online" : "offline"} />
+              <span>
+                {extensionConnected
+                  ? "Extension Connected"
+                  : "Extension Disconnected"}
+              </span>
             </div>
 
             <div className="hidden lg:flex items-center px-2.5 py-1.5 rounded-lg bg-primary/8 border border-primary/20 text-xs font-mono font-semibold text-primary">

@@ -45,11 +45,7 @@ import { LiveSignalsSlider } from "@/components/dashboard/live-signals-slider";
 import { useRecentSignals } from "@/hook/useSignals";
 import { useSignalsWebSocket } from "@/hook/useSignalsWebSocket";
 import { useSession } from "@/hook/useSession";
-import {
-  useWatchlist,
-  useUpdateWatchlist,
-  useSyncPinnedTabs,
-} from "@/hook/useMarketData";
+import { useWatchlist } from "@/hook/useMarketData";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type SignalMode = "UP" | "DOWN" | "WAIT";
@@ -80,6 +76,10 @@ interface SignalData {
   created_at?: string;
   votes?: StrategyVote[];
   strategy_breakdown?: Record<string, any>;
+  is_active?: boolean;
+  is_active_chart?: boolean;
+  candle_count?: number;
+  regime_summary?: string;
 }
 
 // Default waiting/standby state when engine is monitoring Quotex ticks and waiting for setups
@@ -171,13 +171,18 @@ export default function LiveSignalsPage() {
 
   // 100% Real-Time Clock synchronized to UTC+5 (PKT)
   const [nowDate, setNowDate] = useState<Date | null>(null);
+  const startTimeRef = useRef<number>(0);
 
   useEffect(() => {
-    setNowDate(new Date());
-    // Interval 250ms keeps seconds razor-sharp with zero clock drift
+    const now = Date.now();
+    startTimeRef.current = now;
+    setNowDate(new Date(now));
+
+    // Update once per second — enough for seconds display without 4x/sec re-renders
     const timer = setInterval(() => {
-      setNowDate(new Date());
-    }, 250);
+      const now = Date.now();
+      setNowDate(new Date(now));
+    }, 1000);
     return () => clearInterval(timer);
   }, []);
 
@@ -213,93 +218,92 @@ export default function LiveSignalsPage() {
     },
   );
 
-  // WebSocket: real-time signal feed from backend (signal/qualified, signal/wait, connected, watchlist/updated)
+  // WebSocket: real-time signal feed from backend (signal/qualified, signal/wait, connected)
   const {
-    sessionId: wsSessionId,
     activeSignal: wsActiveSignal,
     activeChartAsset: wsActiveChartAsset,
-    watchlist: wsWatchlist,
-    watchlistAsset: wsWatchlistAsset,
-    totalWatchlistAssets: wsTotalWatchlistAssets,
   } = useSignalsWebSocket();
 
-  // Session from /auth/session — source of truth for session_id
-  const { session: authSession } = useSession();
+  // Session from /auth/session — source of truth for auth state
+  const { session: authSession, loading: sessionLoading } = useSession();
 
-  // Prefer session_id from /auth/session, fall back to WebSocket session_id
-  const resolvedSessionId =
-    authSession?.session_id || wsSessionId || null;
-
-  // Persist resolved session_id for watchlist API calls
-  useEffect(() => {
-    if (resolvedSessionId && typeof window !== "undefined") {
-      localStorage.setItem("apex_session_id", resolvedSessionId);
-    }
-  }, [resolvedSessionId]);
-
-  // REST API: Get current watchlist using session_id from /auth/session
+  // Watchlist pairs from GET /extension/watchlist/?session_id=<session_id>
+  const watchlistSessionId = authSession?.session_id ?? null;
   const {
     data: restWatchlist,
     isLoading: watchlistLoading,
     refetch: refetchWatchlist,
-  } = useWatchlist(resolvedSessionId as any, {
-    refetchInterval: 5000,
+  } = useWatchlist(watchlistSessionId as any, {
+    refetchInterval: 1000,
     refetchOnWindowFocus: false,
-    enabled: !!resolvedSessionId,
+    enabled: !!watchlistSessionId,
   });
 
-  // REST API: Update watchlist (sync from WebSocket)
-  const updateWatchlistMutation = useUpdateWatchlist();
+  // Build watchlist asset set for filtering signalsList
+  const watchlistAssetSet = useMemo(() => {
+    if (!restWatchlist) return new Set<string>();
 
-  // REST API: Sync pinned tabs
-  const syncPinnedTabsMutation = useSyncPinnedTabs();
+    let list: any[] = [];
 
-  // Sync WebSocket watchlist/updated data to REST API watchlist
-  useEffect(() => {
-    if (!wsWatchlist || wsWatchlist.length === 0) return;
-    if (!resolvedSessionId) return;
+    if (typeof restWatchlist === "string") {
+      try {
+        list = JSON.parse(restWatchlist);
+      } catch {
+        return new Set<string>();
+      }
+    } else if (Array.isArray(restWatchlist)) {
+      list = restWatchlist;
+    } else if (typeof restWatchlist === "object") {
+      // Try direct array keys on the root object
+      for (const key of [
+        "watchlist",
+        "data",
+        "items",
+        "signals",
+        "pairs",
+        "records",
+        "list",
+        "result",
+        "response",
+        "payload",
+      ]) {
+        if (Array.isArray(restWatchlist[key])) {
+          list = restWatchlist[key];
+          break;
+        }
+      }
+      // Try deeply nested structures (e.g. { data: { watchlist: [...] } })
+      if (!Array.isArray(list) && restWatchlist.data && typeof restWatchlist.data === "object") {
+        for (const key of [
+          "watchlist",
+          "data",
+          "items",
+          "signals",
+          "pairs",
+          "records",
+          "list",
+        ]) {
+          if (Array.isArray(restWatchlist.data[key])) {
+            list = restWatchlist.data[key];
+            break;
+          }
+        }
+      }
+    }
 
-    // Build payload for POST /extension/watchlist/
-    const payload = {
-      session_id: resolvedSessionId,
-      active_asset: wsWatchlistAsset,
-      total_assets: wsTotalWatchlistAssets,
-      watchlist: wsWatchlist.map((item: any) => ({
-        asset: item.asset,
-        broker_payout: item.broker_payout,
-        candle_count: item.candle_count,
-        spot_price: item.spot_price,
-        market_regime: item.market_regime,
-        regime_summary: item.regime_summary,
-        is_active: item.is_active,
-        is_active_chart: item.is_active_chart,
-      })),
-      timestamp: new Date().toISOString(),
-    };
-
-    updateWatchlistMutation.mutate(payload as any);
-  }, [
-    wsWatchlist,
-    wsWatchlistAsset,
-    wsTotalWatchlistAssets,
-    resolvedSessionId,
-    updateWatchlistMutation,
-  ]);
-
-  // Sync pinned tabs via extension tabs endpoint
-  useEffect(() => {
-    if (!wsWatchlist || wsWatchlist.length === 0) return;
-    if (!resolvedSessionId) return;
-
-    const pinnedAssets = wsWatchlist
-      .filter((item: any) => item.is_active_chart)
-      .map((item: any) => item.asset);
-
-    syncPinnedTabsMutation.mutate({
-      session_id: resolvedSessionId as string,
-      pinned_assets: pinnedAssets,
-    } as any);
-  }, [wsWatchlist, resolvedSessionId, syncPinnedTabsMutation]);
+    const set = new Set<string>();
+    for (const item of list) {
+      if (item && item.asset) {
+        set.add(
+          item.asset
+            .toUpperCase()
+            .replace(/[\/\s\(\)\-_]/g, "")
+            .replace(/OTC$/, ""),
+        );
+      }
+    }
+    return set;
+  }, [restWatchlist]);
 
   // Instantly trigger sync on M1 candle boundaries (:00, :01) to catch newly qualified signal with 0ms latency
   const lastSecondRef = useRef<number>(-1);
@@ -376,54 +380,6 @@ export default function LiveSignalsPage() {
     return [];
   }, []);
 
-  // Helper to normalize watchlist array from REST API (handles array, object envelope, or stringified JSON)
-  const normalizeWatchlistArray = useCallback((raw: any): any[] => {
-    if (raw == null) return [];
-    let parsed: any = raw;
-    if (typeof parsed === "string") {
-      try {
-        parsed = JSON.parse(parsed);
-      } catch {
-        return [];
-      }
-    }
-    if (Array.isArray(parsed)) return parsed;
-    if (typeof parsed === "object") {
-      if (Array.isArray(parsed.watchlist)) return parsed.watchlist;
-      if (parsed.id) return [parsed];
-      for (const key of [
-        "signals",
-        "data",
-        "items",
-        "results",
-        "pairs",
-        "records",
-        "list",
-      ]) {
-        if (Array.isArray(parsed[key])) return parsed[key];
-      }
-      for (const outer of ["data", "result", "response", "payload"]) {
-        const inner = parsed[outer];
-        if (inner && typeof inner === "object") {
-          if (Array.isArray(inner)) return inner;
-          if (Array.isArray(inner.watchlist)) return inner.watchlist;
-          for (const key of [
-            "signals",
-            "data",
-            "items",
-            "results",
-            "pairs",
-            "records",
-            "list",
-          ]) {
-            if (Array.isArray(inner[key])) return inner[key];
-          }
-        }
-      }
-    }
-    return [];
-  }, []);
-
   // Helper to parse signal timestamp as UTC epoch ms
   const parseSignalTime = useCallback((dateStr?: string): number => {
     if (!dateStr) return 0;
@@ -447,94 +403,57 @@ export default function LiveSignalsPage() {
 
   const hasLiveSignals = signalsList.length > 0;
 
-  // Active watchlist pairs from WebSocket watchlist/updated event — source of truth
-  const watchlistPairs: SignalData[] = useMemo(() => {
-    const wsList = wsWatchlist && wsWatchlist.length > 0 ? wsWatchlist : null;
-    const restList = normalizeWatchlistArray(restWatchlist);
-    const list = wsList ?? restList;
-    return list.map((item: any, i: number) => {
-      const asset = item.asset || `PAIR_${i}`;
-      return {
-        id: `watchlist-${asset}`,
-        asset,
-        direction: "WAIT",
-        confidence_score: 0,
-        consensus_count: 0,
-        opposition_count: 0,
-        status_code: item.is_active_chart ? "ACTIVE_CHART" : "MONITORING_ACTIVE",
-        is_qualified: false,
-        broker_payout: item.broker_payout ?? 0,
-        spot_price: item.spot_price ?? undefined,
-        market_regime: item.market_regime ?? "STANDBY_MONITORING",
-        regime_summary: item.regime_summary ?? undefined,
-        created_at: undefined,
-        is_active: item.is_active ?? false,
-        is_active_chart: item.is_active_chart ?? false,
-        candle_count: item.candle_count ?? 0,
-        votes: [
-          {
-            strategy_name: "CANDLESTICK_PRICE_ACTION",
-            direction: "WAIT",
-            confidence_score: 0,
-            reason_code: "SR_NO_SETUP",
-            eligible: true,
-          },
-          {
-            strategy_name: "SR_REVERSAL",
-            direction: "WAIT",
-            confidence_score: 0,
-            reason_code: "SR_NO_SETUP",
-            eligible: true,
-          },
-          {
-            strategy_name: "EMA_RSI_PULLBACK",
-            direction: "WAIT",
-            confidence_score: 0,
-            reason_code: "NONE",
-            eligible: true,
-          },
-        ],
-      } as SignalData;
-    });
-  }, [wsWatchlist, restWatchlist]);
-
+  // Active watchlist pairs from GET /extension/watchlist/?session_id=<session_id>
   // Combined Unique Active Pairs for the Live Signals Stream Slider
-  // Strictly deduplicates by currency pair so each pair appears EXACTLY ONCE!
-  // When WebSocket watchlist data exists, filter signalsList to only include
-  // watchlisted assets so only selected pairs are shown.
+  // Only signals whose asset is in the active watchlist are displayed!
   const displaySignals: SignalData[] = useMemo(() => {
     const seenAssets = new Set<string>();
     const uniqueList: SignalData[] = [];
 
-    // Build watchlist asset set when watchlist data is available
-    const watchlistAssetSet = new Set<string>();
-    for (const wp of watchlistPairs) {
-      const key = wp.asset ? wp.asset.toUpperCase().trim() : "";
-      if (key) watchlistAssetSet.add(key);
-    }
+    const normalizeKey = (sym?: string) => {
+      if (!sym) return "";
+      return sym.toUpperCase().replace(/[\/\s\(\)\-_]/g, "").replace(/OTC$/, "");
+    };
 
-    // 1. Prioritize latest signal for each asset from signalsList
-    //    If watchlist exists, only show signals for watchlisted assets.
+    // Map each signal from signalsList, deduplicating by currency pair
+    // Only include signals that are in the active watchlist
     for (const sig of signalsList) {
-      const assetKey = sig.asset ? sig.asset.toUpperCase().trim() : "";
-      if (!assetKey || seenAssets.has(assetKey)) continue;
-      // When watchlist data is present, skip signals not in the watchlist
-      if (watchlistAssetSet.size > 0 && !watchlistAssetSet.has(assetKey)) continue;
-      seenAssets.add(assetKey);
-      uniqueList.push(sig);
-    }
+      const normKey = normalizeKey(sig.asset);
+      if (!normKey || seenAssets.has(normKey)) continue;
 
-    // 2. Append active watchlist pairs from WebSocket watchlist/updated that aren't already included
-    for (const pair of watchlistPairs) {
-      const assetKey = pair.asset ? pair.asset.toUpperCase().trim() : "";
-      if (assetKey && !seenAssets.has(assetKey)) {
-        seenAssets.add(assetKey);
-        uniqueList.push(pair);
+      // When watchlist data exists, only show signals for watchlisted assets
+      if (watchlistAssetSet.size > 0 && !watchlistAssetSet.has(normKey)) continue;
+
+      seenAssets.add(normKey);
+
+      // Candle freshness check — stale signals (previous minute) show WAIT instead of old UP/DOWN
+      let signalData = sig;
+      if (nowDate && sig.created_at) {
+        const sigTime = parseSignalTime(sig.created_at);
+        if (sigTime) {
+          const sigDate = new Date(sigTime);
+          if (
+            sigDate.getMinutes() !== nowDate.getMinutes() ||
+            sigDate.getHours() !== nowDate.getHours()
+          ) {
+            signalData = {
+              ...sig,
+              direction: "WAIT",
+              status_code: sig.status_code || "CANDLE_EXPIRED",
+              is_qualified: false,
+              confidence_score: sig.confidence_score ?? 0,
+              consensus_count: sig.consensus_count ?? 0,
+              votes: sig.votes || WAIT_SIGNAL.votes,
+            } as SignalData;
+          }
+        }
       }
+
+      uniqueList.push(signalData);
     }
 
     return uniqueList;
-  }, [signalsList, watchlistPairs]);
+  }, [signalsList, watchlistAssetSet, nowDate]);
 
   // Auto-select the active chart asset from backend/extension when it changes
   const [wsAssetSelected, setWsAssetSelected] = useState<string | null>(null);
@@ -597,21 +516,100 @@ export default function LiveSignalsPage() {
   //    Display dynamic WAIT/Standby state for the monitored pair.
   const activeSignal: SignalData = useMemo(() => {
     // ── 1. User's explicit inspection from slider or table ──
+    // Only show the selected signal if it belongs to the current 60-second candle.
+    // If it's stale (from a previous minute), show WAIT for THAT selected pair —
+    // not the standby pair's data.
     if (selectedSignalId) {
       const found = displaySignals.find((s) => s.id === selectedSignalId);
-      if (found) return found;
+      if (found) {
+        if (!nowDate || !found.created_at) {
+          // No timestamp — show this pair in WAIT standby state
+          return {
+            ...WAIT_SIGNAL,
+            id: found.id,
+            asset: found.asset,
+            broker_payout: found.broker_payout,
+            status_code: "WAITING_FOR_SETUP",
+            is_qualified: false,
+            confidence_score: 0,
+            consensus_count: 0,
+            votes: WAIT_SIGNAL.votes,
+          };
+        }
+        const sigTime = parseSignalTime(found.created_at);
+        if (sigTime) {
+          const sigDate = new Date(sigTime);
+          // Signal belongs to current candle → show it
+          if (
+            sigDate.getMinutes() === nowDate.getMinutes() &&
+            sigDate.getHours() === nowDate.getHours()
+          ) {
+            return found;
+          }
+        }
+        // Signal is stale → show WAIT for this selected pair's asset
+        return {
+          ...WAIT_SIGNAL,
+          id: found.id,
+          asset: found.asset,
+          broker_payout: found.broker_payout,
+          status_code: "CANDLE_EXPIRED",
+          is_qualified: false,
+          confidence_score: 0,
+          consensus_count: 0,
+          votes: WAIT_SIGNAL.votes,
+        };
+      }
+      // Selected signal not found → fall through to WAIT state below
     }
 
-    // ── 2. Check for active qualified signal in the current candle from WebSocket ──
+    // ── 2. Candle expiry check ──
+    // If we've crossed into a new 60-second candle, any signal from the previous
+    // minute is stale. Show WAIT immediately — no waiting for WebSocket signal/wait
+    // or REST polling delay.
+    if (nowDate && latestBackendSignal && latestBackendSignal.created_at) {
+      const signalTime = parseSignalTime(latestBackendSignal.created_at);
+      if (signalTime) {
+        const signalDate = new Date(signalTime);
+        if (
+          signalDate.getMinutes() !== nowDate.getMinutes() ||
+          signalDate.getHours() !== nowDate.getHours()
+        ) {
+          return {
+            ...latestBackendSignal,
+            direction: "WAIT",
+            status_code: latestBackendSignal.status_code || "CANDLE_EXPIRED",
+            is_qualified: false,
+            confidence_score: latestBackendSignal.confidence_score ?? 0,
+            consensus_count: latestBackendSignal.consensus_count ?? 0,
+            votes: latestBackendSignal.votes || WAIT_SIGNAL.votes,
+          };
+        }
+      }
+    }
+
+    // ── 3. Check for active qualified signal in the current candle from WebSocket ──
     if (
       wsActiveSignal &&
       wsActiveSignal.is_qualified &&
       (wsActiveSignal.direction === "UP" || wsActiveSignal.direction === "DOWN")
     ) {
+      // If backend REST reports WAIT, the WebSocket UP/DOWN is stale — show WAIT instead
+      if (latestBackendSignal && isBackendSignalWait(latestBackendSignal)) {
+        return {
+          ...latestBackendSignal,
+          direction: "WAIT",
+          status_code: latestBackendSignal.status_code || "WAITING_FOR_SETUP",
+          is_qualified: false,
+          confidence_score: latestBackendSignal.confidence_score ?? 0,
+          consensus_count: latestBackendSignal.consensus_count ?? 0,
+          votes: latestBackendSignal.votes || WAIT_SIGNAL.votes,
+        };
+      }
       return wsActiveSignal;
     }
 
-    // ── 3. Check for active qualified signal in the current candle from REST polling ──
+    // ── 4. Check for active qualified signal in the current candle from REST polling ──
     if (
       latestBackendSignal &&
       !isBackendSignalWait(latestBackendSignal) &&
@@ -620,7 +618,7 @@ export default function LiveSignalsPage() {
       return latestBackendSignal;
     }
 
-    // ── 4. If WebSocket explicitly sent a WAIT signal with live telemetry, use its asset info ──
+    // ── 5. If WebSocket explicitly sent a WAIT signal with live telemetry, use its asset info ──
     if (
       wsActiveSignal &&
       (wsActiveSignal.direction === "WAIT" ||
@@ -643,7 +641,7 @@ export default function LiveSignalsPage() {
       };
     }
 
-    // ── 5. REST API latest signal is WAIT/standby ──
+    // ── 6. REST API latest signal is WAIT/standby ──
     if (latestBackendSignal && isBackendSignalWait(latestBackendSignal)) {
       return {
         ...latestBackendSignal,
@@ -656,9 +654,15 @@ export default function LiveSignalsPage() {
       };
     }
 
-    // ── 6. Default dynamic WAITING STATE for the monitored pair ──
-    const monitoredAsset = displaySignals[0]?.asset || "EURUSD_OTC";
-    const monitoredPayout = displaySignals[0]?.broker_payout || undefined;
+    // ── 7. Default dynamic WAITING STATE for the monitored pair ──
+    const monitoredAsset =
+      wsActiveChartAsset ||
+      displaySignals[0]?.asset ||
+      "EURUSD_OTC";
+    const monitoredPayout =
+      displaySignals.find((s) => s.asset === monitoredAsset)?.broker_payout ||
+      displaySignals[0]?.broker_payout ||
+      undefined;
 
     return {
       ...WAIT_SIGNAL,
@@ -670,6 +674,7 @@ export default function LiveSignalsPage() {
   }, [
     selectedSignalId,
     displaySignals,
+    wsActiveChartAsset,
     latestBackendSignal,
     isBackendSignalWait,
     isSignalStillActiveCandle,
@@ -803,8 +808,17 @@ export default function LiveSignalsPage() {
                     ? `LIVE BEACON SIGNALS FEED CONNECTED (${signalsList.length} QUALIFIED)`
                     : "QUOTEX TELEMETRY INGESTION STREAM ACTIVE"}
                 </span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  HTTP 202 ACCEPTED
+                <span
+                  className={cn(
+                    "text-[10px] font-mono px-2 py-0.5 rounded-full border shrink-0",
+                    activeSignal?.direction === "UP"
+                      ? "bg-up/10 text-up border-up/20"
+                      : activeSignal?.direction === "DOWN"
+                      ? "bg-down/10 text-down border-down/20"
+                      : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+                  )}
+                >
+                  {activeSignal ? `${activeSignal.asset} ${activeSignal.direction}` : "HTTP 202 ACCEPTED"}
                 </span>
               </div>
               <p className="text-xs text-muted-foreground mt-0.5">
@@ -855,112 +869,6 @@ export default function LiveSignalsPage() {
           </div>
         </div>
 
-        {/* ── WATCHLIST / PINNED TABS (WebSocket sync) ── */}
-        {(!watchlistLoading && wsWatchlist && wsWatchlist.length > 0) || (
-          restWatchlist && restWatchlist.length > 0
-        ) ? (
-          <section className="rounded-xl border border-border bg-card shadow-xs">
-            <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-secondary/40">
-              <div className="flex items-center gap-2">
-                <Radio className="w-4 h-4 text-primary" />
-                <span className="text-xs font-semibold tracking-tight text-foreground">
-                  Pinned Tabs &amp; Watchlist
-                </span>
-              </div>
-              <div className="flex items-center gap-1 text-[10px] font-mono text-muted-foreground">
-                <span className={cn(
-                  "px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20",
-                  "font-bold"
-                )}>
-                  {wsTotalWatchlistAssets || normalizeWatchlistArray(restWatchlist).length || 0}
-                </span>
-                <span className="text-xs">ASSETS</span>
-                <span className="text-xs font-medium">
-                  {wsWatchlistAsset || restWatchlist?.[0]?.active_asset || "—"}
-                </span>
-              </div>
-            </div>
-
-            <div className="overflow-x-auto">
-              <div className="flex gap-2 p-3 sm:px-5 min-w-[600px]">
-                {(normalizeWatchlistArray(wsWatchlist).length > 0
-                  ? normalizeWatchlistArray(wsWatchlist)
-                  : normalizeWatchlistArray(restWatchlist)
-                ).map(
-                  (item: any, i: number) => {
-                    const isActiveChart = item.is_active_chart;
-                    const isOtc =
-                      item.asset &&
-                      (item.asset.toUpperCase().includes("OTC") ||
-                        item.asset.includes("_otc"));
-                    return (
-                      <button
-                        key={`watchlist-${item.asset}-${i}`}
-                        onClick={() => {
-                          setSelectedSignalId(item.asset || `pair-${i}`);
-                        }}
-                        className={cn(
-                          "flex flex-col items-center gap-2 px-3 py-2.5 rounded-xl border transition-all duration-200 shrink-0 min-w-[150px]",
-                          isActiveChart
-                            ? "bg-primary/10 border-primary/50 shadow-[0_0_20px_rgba(59,130,246,0.2)]"
-                            : "bg-card border-border hover:border-primary/40 hover:bg-secondary/50",
-                        )}
-                      >
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <span className="text-[10px] font-mono font-bold text-foreground">
-                            {isActiveChart ? "●" : "○"}
-                          </span>
-                          <span
-                            className={cn(
-                              "text-[10px] font-bold uppercase tracking-wider",
-                              isActiveChart ? "text-primary" : "text-muted-foreground",
-                              isOtc ? "text-purple-400" : "",
-                            )}
-                          >
-                            {item.asset}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between w-full">
-                          <span
-                            className={cn(
-                              "text-[10px] font-mono",
-                              isActiveChart ? "text-primary font-bold" : "text-subtle",
-                            )}
-                          >
-                            {item.broker_payout ? `${item.broker_payout}%` : "—%"}
-                          </span>
-                          <span
-                            className="text-[10px] font-mono text-muted-foreground"
-                          >
-                            {item.spot_price?.toFixed?.(4) ?? "—"}
-                          </span>
-                        </div>
-                        <div className="mt-1.5 w-full h-[2px] rounded-full overflow-hidden">
-                          <div
-                            className="h-full"
-                            style={{
-                              width: `${Math.min(100, Math.max(0, ((item.candle_count || 0) / 30) * 100))}%`,
-                              backgroundColor: isActiveChart
-                                ? "var(--primary)"
-                                : "var(--border-subtle)",
-                            }}
-                          />
-                        </div>
-                        <p className="text-[9px] text-muted-foreground mt-1 leading-none">
-                          {item.market_regime?.replace(/_/g, " ") || "—"}
-                        </p>
-                        <p className="text-[9px] text-subtle leading-none">
-                          {item.is_active ? "Active" : "Inactive"}
-                        </p>
-                      </button>
-                    );
-                  }
-                )}
-              </div>
-            </div>
-          </section>
-        ) : null}
-
         {/* ── LIVE SIGNALS STREAM SLIDER (Shadcn Slider Component) ── */}
         <LiveSignalsSlider
           signals={displaySignals}
@@ -968,7 +876,7 @@ export default function LiveSignalsPage() {
           onSelectSignal={(id) =>
             setSelectedSignalId((prev) => (prev === id || !id ? null : id))
           }
-          isFetching={isSignalsFetching}
+          isFetching={isSignalsFetching || sessionLoading || watchlistLoading}
         />
 
         {/* ══════════════════════════════════════════════════════════════
@@ -1727,6 +1635,7 @@ export default function LiveSignalsPage() {
                   <th className="px-3 py-3.5">Broker Payout</th>
                   <th className="px-3 py-3.5">Market Regime</th>
                   <th className="px-3 py-3.5">Timestamp</th>
+                  <th className="px-4 py-3.5">Result</th>
                   <th className="px-4 py-3.5 text-right">Action</th>
                 </tr>
               </thead>
@@ -1757,6 +1666,9 @@ export default function LiveSignalsPage() {
                       </td>
                       <td className="px-3 py-3.5">
                         <Skeleton className="h-4 w-20" />
+                      </td>
+                      <td className="px-3 py-3.5">
+                        <Skeleton className="h-4 w-16" />
                       </td>
                       <td className="px-3 py-3.5">
                         <Skeleton className="h-4 w-16" />
@@ -1836,6 +1748,61 @@ export default function LiveSignalsPage() {
                         <td className="px-3 py-3.5 font-mono text-subtle">
                           {sig.created_at ? formatToUTC5(sig.created_at) : "—"}
                         </td>
+                        {/* Result Column */}
+                        <td className="px-3 py-3.5">
+                          <span
+                            className={cn(
+                              "px-2 py-0.5 rounded-md text-[10px] font-mono font-bold border shrink-0",
+                              (() => {
+                                const s = sig as any;
+                                const outcome =
+                                  s.outcome ??
+                                  s.result ??
+                                  (s.is_win !== undefined
+                                    ? s.is_win
+                                      ? "Win"
+                                      : "Loss"
+                                    : undefined);
+                                if (
+                                  outcome === "Win" ||
+                                  outcome === "win" ||
+                                  outcome === "WON"
+                                )
+                                  return "bg-up/10 text-up border-up/20";
+                                if (
+                                  outcome === "Loss" ||
+                                  outcome === "loss" ||
+                                  outcome === "LOST"
+                                )
+                                  return "bg-down/10 text-down border-down/20";
+                                return "bg-secondary text-muted-foreground border-border";
+                              })()
+                            )}
+                          >
+                            {(() => {
+                              const s = sig as any;
+                              const outcome =
+                                s.outcome ??
+                                s.result ??
+                                (s.is_win !== undefined
+                                  ? s.is_win
+                                    ? "Win"
+                                    : "Loss"
+                                  : undefined);
+                              return (
+                                outcome === "Win" ||
+                                outcome === "win" ||
+                                outcome === "WON"
+                                  ? "Win"
+                                : outcome === "Loss" ||
+                                  outcome === "loss" ||
+                                  outcome === "LOST"
+                                  ? "Loss"
+                                  : "Pending"
+                              );
+                            })()}
+                          </span>
+                        </td>
                         <td className="px-4 py-3.5 text-right">
                           <button
                             type="button"
@@ -1858,7 +1825,7 @@ export default function LiveSignalsPage() {
                   })
                 ) : (
                   <tr>
-                    <td colSpan={10} className="px-6 py-8 text-center">
+                    <td colSpan={11} className="px-6 py-8 text-center">
                       <div className="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto">
                         <Radio className="w-8 h-8 text-emerald-400 animate-pulse" />
                         <p className="text-sm font-semibold text-foreground">

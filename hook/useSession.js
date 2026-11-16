@@ -21,7 +21,33 @@ import { getSessionApi } from "@/lib/API/auth";
  * }}
  */
 export function useSession() {
-  const [session, setSession] = useState(null);
+  const getInitialSession = () => {
+    if (typeof window === "undefined") return null;
+    try {
+      const storedSid =
+        localStorage.getItem("apex_session_id") ||
+        localStorage.getItem("session_id");
+      const userStr =
+        localStorage.getItem("user") || localStorage.getItem("apex_user");
+      const user = userStr ? JSON.parse(userStr) : null;
+      const sid = storedSid || user?.session_id || user?.id || null;
+      if (sid) {
+        return {
+          session_id: sid,
+          user_id: user?.id || null,
+          email: user?.email || null,
+          full_name: user?.full_name || null,
+          active_asset: null,
+          is_authenticated: true,
+        };
+      }
+    } catch {
+      return null;
+    }
+    return null;
+  };
+
+  const [session, setSession] = useState(getInitialSession);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -30,21 +56,54 @@ export function useSession() {
     setError(null);
     try {
       const data = await getSessionApi();
+      const sid =
+        data?.session_id ||
+        data?.user?.session_id ||
+        data?.data?.session_id ||
+        data?.user_id ||
+        data?.id ||
+        data?.user?.id ||
+        null;
+
+      const user_id =
+        data?.user_id ||
+        data?.user?.id ||
+        data?.id ||
+        null;
+
+      const email =
+        data?.email ||
+        data?.user?.email ||
+        null;
+
+      const full_name =
+        data?.full_name ||
+        data?.user?.full_name ||
+        null;
+
+      const active_asset =
+        data?.active_asset ||
+        data?.data?.active_asset ||
+        null;
+
       setSession({
-        session_id: data.session_id ?? null,
-        user_id: data.user_id ?? null,
-        email: data.email ?? null,
-        full_name: data.full_name ?? null,
-        active_asset: data.active_asset ?? null,
-        is_authenticated: data.is_authenticated ?? false,
+        session_id: sid,
+        user_id,
+        email,
+        full_name,
+        active_asset,
+        is_authenticated: data?.is_authenticated ?? true,
       });
+
       // Persist session_id for watchlist API calls
-      if (typeof window !== "undefined" && data.session_id) {
-        localStorage.setItem("apex_session_id", data.session_id);
+      if (typeof window !== "undefined" && sid) {
+        localStorage.setItem("apex_session_id", sid);
+        localStorage.setItem("session_id", sid);
       }
     } catch (err) {
       setError(err?.message || "Failed to fetch session");
-      setSession(null);
+      // Retain existing session from localStorage if network fails temporarily
+      setSession((prev) => prev ?? null);
     } finally {
       setLoading(false);
     }
