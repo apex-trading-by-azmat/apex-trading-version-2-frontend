@@ -46,7 +46,9 @@ export const useWatchlist = (sessionId = null, options = {}) => {
   return useQuery({
     queryKey: ["extension", "watchlist", resolved],
     queryFn: () => getWatchlistApi(resolved),
-    refetchInterval: options.refetchInterval ?? 5000,
+    refetchInterval: options.refetchInterval ?? false,
+    staleTime: options.staleTime ?? Infinity,
+    refetchOnWindowFocus: options.refetchOnWindowFocus ?? false,
     ...options,
   });
 };

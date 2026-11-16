@@ -16,19 +16,23 @@ export const useLogin = (options = {}) => {
     mutationFn: (credentials) => loginApi(credentials),
     onSuccess: (data, variables, context) => {
       if (typeof window !== "undefined") {
-        if (data?.access_token) {
-          localStorage.setItem("access_token", data.access_token);
-          localStorage.setItem("apex_token", data.access_token);
-          localStorage.setItem("apex_access_token", data.access_token);
-          apiClient.defaults.headers.common["Authorization"] = `Bearer ${data.access_token}`;
+        const accessToken = data?.access_token || data?.tokens?.access;
+        const refreshToken = data?.refresh_token || data?.tokens?.refresh;
+        const user = data?.user;
+
+        if (accessToken) {
+          localStorage.setItem("access_token", accessToken);
+          localStorage.setItem("apex_token", accessToken);
+          localStorage.setItem("apex_access_token", accessToken);
+          apiClient.defaults.headers.common["Authorization"] = `Bearer ${accessToken}`;
         }
-        if (data?.refresh_token) {
-          localStorage.setItem("refresh_token", data.refresh_token);
-          localStorage.setItem("apex_refresh_token", data.refresh_token);
+        if (refreshToken) {
+          localStorage.setItem("refresh_token", refreshToken);
+          localStorage.setItem("apex_refresh_token", refreshToken);
         }
-        if (data?.user) {
-          localStorage.setItem("user", JSON.stringify(data.user));
-          localStorage.setItem("apex_user", JSON.stringify(data.user));
+        if (user) {
+          localStorage.setItem("user", JSON.stringify(user));
+          localStorage.setItem("apex_user", JSON.stringify(user));
         }
       }
 

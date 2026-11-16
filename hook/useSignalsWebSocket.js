@@ -1,12 +1,15 @@
 import { useEffect, useState, useRef, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 /**
  * WebSocket Signals Hook
  * Connects to the Apex FastAPI signals WebSocket feed and handles:
  *   - connected        -> stores session_id, updates connection status
- *   signal/qualified   -> updates active signal (UP/DOWN)
- *   signal/wait        -> updates active signal (WAIT/standby)
- *   watchlist/updated  -> syncs pinned tabs / watchlist from extension
+ *   - signal/qualified -> updates active signal (UP/DOWN) & queries cache
+ *   - signal/wait      -> updates active signal (WAIT/standby) & queries cache
+ *   - chart/active_asset -> updates active chart pair & active pair state
+ *   - watchlist/updated  -> syncs pinned tabs / watchlist from extension & queries cache
+ *   - order/settled    -> syncs trade settlement and attribution
  *
  * Exposes the latest signal, session_id, active chart asset, watchlist, and connection status.
  *
@@ -14,6 +17,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
  *   sessionId: string | null,
  *   activeSignal: any | null,
  *   activeChartAsset: string | null,
+ *   activeChartPayout: number | null,
  *   watchlist: any[],
  *   watchlistAsset: string | null,
  *   totalWatchlistAssets: number,
@@ -23,9 +27,11 @@ import { useEffect, useState, useRef, useCallback } from "react";
  * }}
  */
 export function useSignalsWebSocket() {
+  const queryClient = useQueryClient();
   const [sessionId, setSessionId] = useState(null);
   const [activeSignal, setActiveSignal] = useState(null);
   const [activeChartAsset, setActiveChartAsset] = useState(null);
+  const [activeChartPayout, setActiveChartPayout] = useState(null);
   const [watchlist, setWatchlist] = useState([]);
   const [watchlistAsset, setWatchlistAsset] = useState(null);
   const [totalWatchlistAssets, setTotalWatchlistAssets] = useState(0);
@@ -98,21 +104,79 @@ export function useSignalsWebSocket() {
             return;
           }
 
+          if (msg.event === "chart/active_asset") {
+            const data = msg.data || {};
+            setLastEvent("chart/active_asset");
+            const activeAsset = data.active_asset || data.asset || null;
+            if (activeAsset) {
+              setActiveChartAsset(activeAsset);
+              setWatchlistAsset(activeAsset);
+              if (data.broker_payout !== undefined) {
+                setActiveChartPayout(data.broker_payout);
+              }
+              setActiveSignal((prev) => ({
+                id: `standby-${activeAsset}`,
+                asset: activeAsset,
+                broker_payout: data.broker_payout ?? prev?.broker_payout ?? 0,
+                direction: "WAIT",
+                status_code: "WAITING_FOR_SETUP",
+                is_qualified: false,
+                confidence_score: 0,
+                consensus_count: 0,
+                opposition_count: 0,
+                event: "chart/active_asset",
+                received_at: new Date().toISOString(),
+              }));
+            }
+            return;
+          }
+
           if (
             msg.event === "signal/qualified" ||
-            msg.event === "signal/wait"
+            msg.event === "signal/wait" ||
+            msg.type === "signal" ||
+            msg.type === "signal_result"
           ) {
-            const data = msg.data || {};
-            setLastEvent(msg.event);
-            setActiveChartAsset(
-              data.active_chart_asset || data.asset || null,
-            );
-            setActiveSignal({
+            const data = msg.data || msg.payload || {};
+            const eventName = msg.event || msg.type;
+            setLastEvent(eventName);
+            const chartAsset = data.active_chart_asset || data.asset || null;
+            if (chartAsset) {
+              setActiveChartAsset(chartAsset);
+            }
+            const signalId = data.id || `sig-${data.asset || "unknown"}-${data.timestamp || Date.now()}`;
+            const signalObj = {
               ...data,
+              id: signalId,
               direction: data.direction || "WAIT",
-              event: msg.event,
+              event: eventName,
               received_at: new Date().toISOString(),
-            });
+            };
+            setActiveSignal(signalObj);
+
+            // Update TanStack query cache for recent signals in-memory
+            try {
+              queryClient.setQueriesData(
+                { queryKey: ["signals", "recent"] },
+                (old) => {
+                  if (!old) return [signalObj];
+                  const list = Array.isArray(old) ? [...old] : [old];
+                  const idx = list.findIndex(
+                    (s) =>
+                      (s.id && signalObj.id && s.id === signalObj.id) ||
+                      (s.asset === signalObj.asset && s.created_at === signalObj.created_at)
+                  );
+                  if (idx >= 0) {
+                    list[idx] = { ...list[idx], ...signalObj };
+                  } else {
+                    list.unshift(signalObj);
+                  }
+                  return list.slice(0, 50);
+                }
+              );
+            } catch {
+              // Ignore cache update errors
+            }
             return;
           }
 
@@ -127,9 +191,33 @@ export function useSignalsWebSocket() {
             }
             if (Array.isArray(data.watchlist)) {
               setWatchlist(data.watchlist);
+              // Update TanStack query cache for watchlist in-memory
+              try {
+                queryClient.setQueriesData(
+                  { queryKey: ["extension", "watchlist"] },
+                  data.watchlist
+                );
+              } catch {
+                // Ignore cache update errors
+              }
             }
-            setWatchlistAsset(data.active_asset || null);
-            setTotalWatchlistAssets(data.total_assets || 0);
+            if (data.active_asset) {
+              setWatchlistAsset(data.active_asset);
+              setActiveChartAsset(data.active_asset);
+            }
+            setTotalWatchlistAssets(
+              data.total_assets || (Array.isArray(data.watchlist) ? data.watchlist.length : 0)
+            );
+            return;
+          }
+
+          if (msg.event === "order/opened" || msg.event === "order/settled") {
+            setLastEvent(msg.event);
+            try {
+              queryClient.invalidateQueries({ queryKey: ["signals", "attribution"] });
+            } catch {
+              // Ignore cache update errors
+            }
             return;
           }
         } catch {
@@ -193,6 +281,7 @@ export function useSignalsWebSocket() {
     sessionId,
     activeSignal,
     activeChartAsset,
+    activeChartPayout,
     watchlist,
     watchlistAsset,
     totalWatchlistAssets,

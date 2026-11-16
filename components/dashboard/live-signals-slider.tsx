@@ -363,7 +363,8 @@ export function LiveSignalsSlider({
             onScroll={updateScrollBounds}
             className="flex items-stretch gap-2.5 overflow-x-auto scroll-smooth snap-x snap-mandatory py-1 px-0.5 scrollbar-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden w-full max-w-full"
           >
-            {filteredSignals.map((sig) => {
+            {filteredSignals.map((sig, idx) => {
+              const sigKey = sig.id || `slider-pair-${sig.asset || idx}`;
               const isSelected = activeSignalId === sig.id;
               const isSigUp = sig.direction === "UP";
               const isSigDown = sig.direction === "DOWN";
@@ -371,8 +372,8 @@ export function LiveSignalsSlider({
 
               return (
                 <div
-                  key={sig.id}
-                  onClick={() => onSelectSignal(isSelected ? "" : sig.id)}
+                  key={sigKey}
+                  onClick={() => onSelectSignal(isSelected ? "" : (sig.id || sigKey))}
                   className={cn(
                     "snap-start shrink-0 min-w-[230px] max-w-[270px] p-3 rounded-xl border text-left cursor-pointer select-none transition-all duration-150 flex flex-col justify-between gap-2.5",
                     isSelected

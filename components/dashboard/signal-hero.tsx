@@ -1,5 +1,8 @@
-import { PauseCircle, ShieldAlert, Clock, Zap } from "lucide-react";
-import { CurrencyPairDisplay } from "@/components/ui/currency-pair";
+"use client";
+
+import { PauseCircle, ShieldAlert, ArrowUpRight, ArrowDownRight, Zap } from "lucide-react";
+import { CurrencyPairDisplay, parsePair } from "@/components/ui/currency-pair";
+import { useSignalsWebSocket } from "@/hook/useSignalsWebSocket";
 import { cn } from "@/lib/utils";
 
 const rules = [
@@ -10,6 +13,11 @@ const rules = [
 ];
 
 export function SignalHero() {
+  const { activeChartAsset, activeChartPayout, activeSignal } = useSignalsWebSocket();
+  const currentAsset = activeChartAsset || activeSignal?.asset || "EURUSD_OTC";
+  const { base, quote } = parsePair(currentAsset);
+  const isOtc = currentAsset.toUpperCase().includes("OTC");
+  const payout = activeChartPayout ?? activeSignal?.broker_payout;
   return (
     <div className="rounded-xl bg-card border border-border overflow-hidden shadow-sm">
       {/* Header strip */}
@@ -55,12 +63,12 @@ export function SignalHero() {
             <div className="col-span-2 px-3 py-2.5 rounded-lg bg-secondary border border-border flex items-center justify-between gap-3">
               <div className="flex flex-col gap-0.5">
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                  Default Asset
+                  Active Asset
                 </p>
-                <CurrencyPairDisplay pair="EUR/USD" market="OTC" size="sm" showMarket />
+                <CurrencyPairDisplay pair={`${base}/${quote}`} market={isOtc ? "OTC" : "REGULAR"} size="sm" showMarket />
               </div>
               <span className="text-[10px] font-bold text-up bg-up/10 border border-up/20 px-2 py-0.5 rounded">
-                Ready
+                {payout ? `${payout}% Payout` : "Ready"}
               </span>
             </div>
             <div className="px-3 py-2.5 rounded-lg bg-secondary border border-border flex flex-col gap-0.5">

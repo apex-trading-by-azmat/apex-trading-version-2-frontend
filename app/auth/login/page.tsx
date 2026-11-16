@@ -24,9 +24,10 @@ export default function LoginPage() {
   }, []);
 
   const { mutate: login, isPending, isError, error } = useLogin({
-    onSuccess: (data: { access_token?: string }) => {
-      if (typeof window !== "undefined" && data?.access_token) {
-        localStorage.setItem("access_token", data.access_token);
+    onSuccess: (data: any) => {
+      const token = data?.access_token || data?.tokens?.access;
+      if (typeof window !== "undefined" && token) {
+        localStorage.setItem("access_token", token);
       }
       router.push("/dashboard");
     },

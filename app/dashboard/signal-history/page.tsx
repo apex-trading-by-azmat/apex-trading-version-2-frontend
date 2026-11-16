@@ -218,7 +218,7 @@ export default function SignalHistoryPage() {
 
                     return (
                       <tr
-                        key={row.id || i}
+                        key={row.id ?? `history-row-${i}`}
                         className="hover:bg-secondary/50 transition-colors group"
                       >
                         <td className="px-5 py-4">

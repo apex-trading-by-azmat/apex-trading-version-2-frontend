@@ -55,7 +55,7 @@ function OutcomeBadge({ outcome }: { outcome: string }) {
 export function RecentSignalsTable() {
   const { data: apiSignals, isFetching, refetch } = useRecentSignals(
     { limit: 10 },
-    { refetchInterval: 5000, refetchOnWindowFocus: false },
+    { refetchInterval: false, staleTime: Infinity, refetchOnWindowFocus: false },
   );
 
   const apiList = Array.isArray(apiSignals)
@@ -147,7 +147,7 @@ export function RecentSignalsTable() {
 
                 return (
                   <tr
-                    key={item.id || i}
+                    key={item.id ?? `recent-row-${i}`}
                     className="hover:bg-secondary/50 transition-colors group"
                   >
                     <td className="px-5 py-4">

@@ -1,5 +1,4 @@
 "use client";
-
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import {
@@ -203,7 +202,7 @@ export default function LiveSignalsPage() {
     });
   }, [nowDate]);
 
-  // TanStack Query: High-speed 1-second polling (active even in background tabs)
+  // TanStack Query: Initial hydration only (real-time updates arrive via WebSockets)
   const {
     data: apiSignals,
     isFetching: isSignalsFetching,
@@ -211,49 +210,60 @@ export default function LiveSignalsPage() {
   } = useRecentSignals(
     { limit: 30 },
     {
-      refetchInterval: 1000,
-      staleTime: 0,
-      refetchIntervalInBackground: true,
-      refetchOnWindowFocus: true,
+      refetchInterval: false,
+      staleTime: Infinity,
+      refetchIntervalInBackground: false,
+      refetchOnWindowFocus: false,
     },
   );
 
-  // WebSocket: real-time signal feed from backend (signal/qualified, signal/wait, connected)
+  // WebSocket: real-time signal feed from backend (signal/qualified, signal/wait, connected, watchlist/updated)
   const {
     activeSignal: wsActiveSignal,
     activeChartAsset: wsActiveChartAsset,
+    activeChartPayout: wsActiveChartPayout,
+    watchlist: wsWatchlist,
   } = useSignalsWebSocket();
 
   // Session from /auth/session — source of truth for auth state
   const { session: authSession, loading: sessionLoading } = useSession();
 
-  // Watchlist pairs from GET /extension/watchlist/?session_id=<session_id>
+  // Watchlist pairs from GET /extension/watchlist/?session_id=<session_id> (initial hydration only)
   const watchlistSessionId = authSession?.session_id ?? null;
   const {
     data: restWatchlist,
     isLoading: watchlistLoading,
     refetch: refetchWatchlist,
   } = useWatchlist(watchlistSessionId as any, {
-    refetchInterval: 1000,
+    refetchInterval: false,
+    staleTime: Infinity,
     refetchOnWindowFocus: false,
     enabled: !!watchlistSessionId,
   });
 
+  // Effective watchlist: prefers real-time WebSocket push, falls back to REST initial hydration
+  const effectiveWatchlist = useMemo(() => {
+    if (Array.isArray(wsWatchlist) && wsWatchlist.length > 0) {
+      return wsWatchlist;
+    }
+    return restWatchlist;
+  }, [wsWatchlist, restWatchlist]);
+
   // Build watchlist asset set for filtering signalsList
   const watchlistAssetSet = useMemo(() => {
-    if (!restWatchlist) return new Set<string>();
+    if (!effectiveWatchlist) return new Set<string>();
 
     let list: any[] = [];
 
-    if (typeof restWatchlist === "string") {
+    if (typeof effectiveWatchlist === "string") {
       try {
-        list = JSON.parse(restWatchlist);
+        list = JSON.parse(effectiveWatchlist);
       } catch {
         return new Set<string>();
       }
-    } else if (Array.isArray(restWatchlist)) {
-      list = restWatchlist;
-    } else if (typeof restWatchlist === "object") {
+    } else if (Array.isArray(effectiveWatchlist)) {
+      list = effectiveWatchlist;
+    } else if (typeof effectiveWatchlist === "object") {
       // Try direct array keys on the root object
       for (const key of [
         "watchlist",
@@ -267,13 +277,13 @@ export default function LiveSignalsPage() {
         "response",
         "payload",
       ]) {
-        if (Array.isArray(restWatchlist[key])) {
-          list = restWatchlist[key];
+        if (Array.isArray(effectiveWatchlist[key])) {
+          list = effectiveWatchlist[key];
           break;
         }
       }
       // Try deeply nested structures (e.g. { data: { watchlist: [...] } })
-      if (!Array.isArray(list) && restWatchlist.data && typeof restWatchlist.data === "object") {
+      if (!Array.isArray(list) && effectiveWatchlist.data && typeof effectiveWatchlist.data === "object") {
         for (const key of [
           "watchlist",
           "data",
@@ -283,8 +293,8 @@ export default function LiveSignalsPage() {
           "records",
           "list",
         ]) {
-          if (Array.isArray(restWatchlist.data[key])) {
-            list = restWatchlist.data[key];
+          if (Array.isArray(effectiveWatchlist.data[key])) {
+            list = effectiveWatchlist.data[key];
             break;
           }
         }
@@ -303,22 +313,7 @@ export default function LiveSignalsPage() {
       }
     }
     return set;
-  }, [restWatchlist]);
-
-  // Instantly trigger sync on M1 candle boundaries (:00, :01) to catch newly qualified signal with 0ms latency
-  const lastSecondRef = useRef<number>(-1);
-  useEffect(() => {
-    if (nowDate) {
-      const sec = nowDate.getSeconds();
-      if (sec !== lastSecondRef.current) {
-        lastSecondRef.current = sec;
-        if (sec === 0 || sec === 1) {
-          refetchSignals();
-          refetchWatchlist();
-        }
-      }
-    }
-  }, [nowDate, refetchSignals, refetchWatchlist]);
+  }, [effectiveWatchlist]);
 
   // Normalize API data to array (handles raw JSON string, array, or envelope object from backend)
   const extractSignalArray = useCallback((raw: any): SignalData[] => {
@@ -391,15 +386,24 @@ export default function LiveSignalsPage() {
 
   const signalsList: SignalData[] = useMemo(() => {
     const list = extractSignalArray(apiSignals);
+    if (wsActiveSignal && wsActiveSignal.id && wsActiveSignal.direction !== "WAIT") {
+      const idx = list.findIndex(
+        (s) => s.id === wsActiveSignal.id || (s.asset === wsActiveSignal.asset && s.created_at === wsActiveSignal.created_at)
+      );
+      if (idx >= 0) {
+        list[idx] = { ...list[idx], ...wsActiveSignal };
+      } else {
+        list.unshift(wsActiveSignal);
+      }
+    }
     // Sort by created_at descending (newest first) so signalsList[0] is always the latest backend signal.
-    // This ensures a WAIT signal returned by the API is not shadowed by an older UP/DOWN signal.
     return list.sort((a, b) => {
       const ta = parseSignalTime(a.created_at);
       const tb = parseSignalTime(b.created_at);
       if (ta !== tb) return tb - ta;
       return 0;
     });
-  }, [apiSignals, extractSignalArray, parseSignalTime]);
+  }, [apiSignals, wsActiveSignal, extractSignalArray, parseSignalTime]);
 
   const hasLiveSignals = signalsList.length > 0;
 
@@ -415,14 +419,27 @@ export default function LiveSignalsPage() {
       return sym.toUpperCase().replace(/[\/\s\(\)\-_]/g, "").replace(/OTC$/, "");
     };
 
+    // Build the strict set of assets: user's pinned tabs + active chart pair from Quotex
+    const allowedAssetSet = new Set<string>(watchlistAssetSet);
+    if (wsActiveChartAsset) {
+      const activeKey = normalizeKey(wsActiveChartAsset);
+      if (activeKey) allowedAssetSet.add(activeKey);
+    }
+
+    // STRICT: When the user first connects and has not pinned tabs or opened an active chart yet,
+    // the watchlist is completely empty. Do NOT show unpinned/historical assets!
+    if (allowedAssetSet.size === 0) {
+      return [];
+    }
+
     // Map each signal from signalsList, deduplicating by currency pair
-    // Only include signals that are in the active watchlist
+    // STRICTLY include only signals for assets the user is actively monitoring/pinned!
     for (const sig of signalsList) {
       const normKey = normalizeKey(sig.asset);
       if (!normKey || seenAssets.has(normKey)) continue;
 
-      // When watchlist data exists, only show signals for watchlisted assets
-      if (watchlistAssetSet.size > 0 && !watchlistAssetSet.has(normKey)) continue;
+      // Filter out any pair that is not in the user's pinned tabs / active chart
+      if (!allowedAssetSet.has(normKey)) continue;
 
       seenAssets.add(normKey);
 
@@ -452,24 +469,59 @@ export default function LiveSignalsPage() {
       uniqueList.push(signalData);
     }
 
+    // Also include any watchlisted/pinned assets that don't have a recent historical signal yet
+    // so they appear on the slider and can be monitored/selected!
+    if (Array.isArray(effectiveWatchlist)) {
+      for (const item of effectiveWatchlist) {
+        if (!item || !item.asset) continue;
+        const normKey = normalizeKey(item.asset);
+        if (!normKey || seenAssets.has(normKey)) continue;
+        seenAssets.add(normKey);
+        uniqueList.push({
+          ...WAIT_SIGNAL,
+          id: `watchlist-${item.asset}`,
+          asset: item.asset,
+          broker_payout: item.broker_payout || 0,
+          status_code: "WAITING_FOR_SETUP",
+          created_at: nowDate ? nowDate.toISOString() : undefined,
+        });
+      }
+    }
+
+    // Ensure the active chart pair from Quotex is always present in displaySignals
+    if (wsActiveChartAsset) {
+      const normKey = normalizeKey(wsActiveChartAsset);
+      if (normKey && !seenAssets.has(normKey)) {
+        seenAssets.add(normKey);
+        uniqueList.unshift({
+          ...WAIT_SIGNAL,
+          id: `active-${wsActiveChartAsset}`,
+          asset: wsActiveChartAsset,
+          broker_payout: wsActiveChartPayout || 0,
+          status_code: "WAITING_FOR_SETUP",
+          created_at: nowDate ? nowDate.toISOString() : undefined,
+        });
+      }
+    }
+
     return uniqueList;
-  }, [signalsList, watchlistAssetSet, nowDate]);
+  }, [signalsList, watchlistAssetSet, effectiveWatchlist, wsActiveChartAsset, wsActiveChartPayout, nowDate]);
 
   // Auto-select the active chart asset from backend/extension when it changes
   const [wsAssetSelected, setWsAssetSelected] = useState<string | null>(null);
   useEffect(() => {
     if (!wsActiveChartAsset || wsAssetSelected === wsActiveChartAsset) return;
+    setWsAssetSelected(wsActiveChartAsset);
     const matching = displaySignals.find(
       (s) =>
         s.asset &&
         s.asset.toUpperCase().trim() ===
-          wsActiveChartAsset.toUpperCase().trim(),
+        wsActiveChartAsset.toUpperCase().trim(),
     );
     if (matching) {
-      setTimeout(() => {
-        setWsAssetSelected(wsActiveChartAsset);
-        setSelectedSignalId(matching.id);
-      }, 0);
+      setSelectedSignalId(matching.id);
+    } else {
+      setSelectedSignalId(null);
     }
   }, [wsActiveChartAsset, displaySignals, wsAssetSelected]);
 
@@ -528,7 +580,7 @@ export default function LiveSignalsPage() {
             ...WAIT_SIGNAL,
             id: found.id,
             asset: found.asset,
-            broker_payout: found.broker_payout,
+            broker_payout: found.broker_payout || (found.asset === wsActiveChartAsset ? wsActiveChartPayout : undefined) || 0,
             status_code: "WAITING_FOR_SETUP",
             is_qualified: false,
             confidence_score: 0,
@@ -552,7 +604,7 @@ export default function LiveSignalsPage() {
           ...WAIT_SIGNAL,
           id: found.id,
           asset: found.asset,
-          broker_payout: found.broker_payout,
+          broker_payout: found.broker_payout || (found.asset === wsActiveChartAsset ? wsActiveChartPayout : undefined) || 0,
           status_code: "CANDLE_EXPIRED",
           is_qualified: false,
           confidence_score: 0,
@@ -592,7 +644,8 @@ export default function LiveSignalsPage() {
     if (
       wsActiveSignal &&
       wsActiveSignal.is_qualified &&
-      (wsActiveSignal.direction === "UP" || wsActiveSignal.direction === "DOWN")
+      (wsActiveSignal.direction === "UP" || wsActiveSignal.direction === "DOWN") &&
+      (!wsActiveChartAsset || wsActiveSignal.asset?.toUpperCase().trim() === wsActiveChartAsset.toUpperCase().trim())
     ) {
       // If backend REST reports WAIT, the WebSocket UP/DOWN is stale — show WAIT instead
       if (latestBackendSignal && isBackendSignalWait(latestBackendSignal)) {
@@ -613,7 +666,8 @@ export default function LiveSignalsPage() {
     if (
       latestBackendSignal &&
       !isBackendSignalWait(latestBackendSignal) &&
-      isSignalStillActiveCandle(latestBackendSignal)
+      isSignalStillActiveCandle(latestBackendSignal) &&
+      (!wsActiveChartAsset || latestBackendSignal.asset?.toUpperCase().trim() === wsActiveChartAsset.toUpperCase().trim())
     ) {
       return latestBackendSignal;
     }
@@ -625,6 +679,17 @@ export default function LiveSignalsPage() {
         (wsActiveSignal.direction as string) === "STANDBY" ||
         wsActiveSignal.is_qualified === false)
     ) {
+      const activePair =
+        wsActiveChartAsset ||
+        wsActiveSignal.active_chart_asset ||
+        wsActiveSignal.asset ||
+        displaySignals[0]?.asset ||
+        "EURUSD_OTC";
+      const payout =
+        (activePair === wsActiveChartAsset ? wsActiveChartPayout : undefined) ??
+        wsActiveSignal.broker_payout ??
+        displaySignals.find((s) => s.asset === activePair)?.broker_payout ??
+        undefined;
       return {
         ...wsActiveSignal,
         direction: "WAIT",
@@ -633,16 +698,17 @@ export default function LiveSignalsPage() {
         confidence_score: wsActiveSignal.confidence_score ?? 0,
         consensus_count: wsActiveSignal.consensus_count ?? 0,
         votes: wsActiveSignal.votes || WAIT_SIGNAL.votes,
-        asset:
-          wsActiveSignal.active_chart_asset ||
-          wsActiveSignal.asset ||
-          displaySignals[0]?.asset ||
-          "EURUSD_OTC",
+        asset: activePair,
+        broker_payout: payout,
       };
     }
 
     // ── 6. REST API latest signal is WAIT/standby ──
-    if (latestBackendSignal && isBackendSignalWait(latestBackendSignal)) {
+    if (
+      latestBackendSignal &&
+      isBackendSignalWait(latestBackendSignal) &&
+      (!wsActiveChartAsset || latestBackendSignal.asset?.toUpperCase().trim() === wsActiveChartAsset.toUpperCase().trim())
+    ) {
       return {
         ...latestBackendSignal,
         direction: "WAIT",
@@ -660,8 +726,9 @@ export default function LiveSignalsPage() {
       displaySignals[0]?.asset ||
       "EURUSD_OTC";
     const monitoredPayout =
-      displaySignals.find((s) => s.asset === monitoredAsset)?.broker_payout ||
-      displaySignals[0]?.broker_payout ||
+      wsActiveChartPayout ??
+      displaySignals.find((s) => s.asset === monitoredAsset)?.broker_payout ??
+      displaySignals[0]?.broker_payout ??
       undefined;
 
     return {
@@ -675,6 +742,7 @@ export default function LiveSignalsPage() {
     selectedSignalId,
     displaySignals,
     wsActiveChartAsset,
+    wsActiveChartPayout,
     latestBackendSignal,
     isBackendSignalWait,
     isSignalStillActiveCandle,
@@ -814,8 +882,8 @@ export default function LiveSignalsPage() {
                     activeSignal?.direction === "UP"
                       ? "bg-up/10 text-up border-up/20"
                       : activeSignal?.direction === "DOWN"
-                      ? "bg-down/10 text-down border-down/20"
-                      : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+                        ? "bg-down/10 text-down border-down/20"
+                        : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
                   )}
                 >
                   {activeSignal ? `${activeSignal.asset} ${activeSignal.direction}` : "HTTP 202 ACCEPTED"}
@@ -886,11 +954,11 @@ export default function LiveSignalsPage() {
           className={cn(
             "relative rounded-2xl border p-6 sm:p-8 lg:p-10 transition-all duration-300 overflow-hidden",
             isUp &&
-              "bg-gradient-to-br from-up/15 via-card to-background border-up/40 shadow-[0_0_50px_rgba(0,200,150,0.12)]",
+            "bg-gradient-to-br from-up/15 via-card to-background border-up/40 shadow-[0_0_50px_rgba(0,200,150,0.12)]",
             isDown &&
-              "bg-gradient-to-br from-down/15 via-card to-background border-down/40 shadow-[0_0_50px_rgba(240,77,92,0.12)]",
+            "bg-gradient-to-br from-down/15 via-card to-background border-down/40 shadow-[0_0_50px_rgba(240,77,92,0.12)]",
             isWait &&
-              "bg-gradient-to-br from-secondary/50 via-card to-background border-border shadow-[0_0_30px_rgba(122,139,160,0.06)]",
+            "bg-gradient-to-br from-secondary/50 via-card to-background border-border shadow-[0_0_30px_rgba(122,139,160,0.06)]",
           )}
         >
           {/* Top Ambient Light Strip */}
@@ -957,7 +1025,7 @@ export default function LiveSignalsPage() {
                     isUp && "bg-up/10 text-up border-up/30",
                     isDown && "bg-down/10 text-down border-down/30",
                     isWait &&
-                      "bg-secondary text-muted-foreground border-border",
+                    "bg-secondary text-muted-foreground border-border",
                   )}
                 >
                   {isWait
@@ -965,7 +1033,7 @@ export default function LiveSignalsPage() {
                     : !isWindowOpen
                       ? "IN-TRADE EXPIRY PHASE"
                       : activeSignal.status_code?.replace(/_/g, " ") ||
-                        "QUALIFIED SIGNAL"}
+                      "QUALIFIED SIGNAL"}
                 </span>
 
                 <span className="text-xs font-mono text-primary bg-primary/10 border border-primary/20 px-3 py-1.5 rounded-lg">
@@ -996,11 +1064,11 @@ export default function LiveSignalsPage() {
                   className={cn(
                     "w-24 h-24 sm:w-28 sm:h-28 rounded-3xl flex items-center justify-center border shrink-0 transition-transform duration-200 shadow-lg",
                     isUp &&
-                      "bg-up/20 border-up/60 text-up shadow-[0_0_40px_rgba(0,200,150,0.3)]",
+                    "bg-up/20 border-up/60 text-up shadow-[0_0_40px_rgba(0,200,150,0.3)]",
                     isDown &&
-                      "bg-down/20 border-down/60 text-down shadow-[0_0_40px_rgba(239,68,68,0.3)]",
+                    "bg-down/20 border-down/60 text-down shadow-[0_0_40px_rgba(239,68,68,0.3)]",
                     isWait &&
-                      "bg-surface-3 border-border text-muted-foreground shadow-xs",
+                    "bg-surface-3 border-border text-muted-foreground shadow-xs",
                   )}
                 >
                   {isUp && (
@@ -1062,7 +1130,7 @@ export default function LiveSignalsPage() {
                     {isWait
                       ? "SCANNING OTC PAIRS"
                       : activeSignal.market_regime?.replace(/_/g, " ") ||
-                        "Bullish Trend"}
+                      "Bullish Trend"}
                   </span>
                   <span className="text-[11px] font-mono text-muted-foreground">
                     {isWait
@@ -1459,9 +1527,9 @@ export default function LiveSignalsPage() {
                   className={cn(
                     "p-5 rounded-xl border bg-card transition-all flex flex-col justify-between space-y-4 shadow-sm relative overflow-hidden",
                     isSatisfied &&
-                      "border-up/50 bg-gradient-to-b from-up/10 to-card shadow-[0_0_20px_rgba(0,200,150,0.08)]",
+                    "border-up/50 bg-gradient-to-b from-up/10 to-card shadow-[0_0_20px_rgba(0,200,150,0.08)]",
                     isOpposing &&
-                      "border-down/50 bg-gradient-to-b from-down/10 to-card shadow-[0_0_20px_rgba(239,68,68,0.08)]",
+                    "border-down/50 bg-gradient-to-b from-down/10 to-card shadow-[0_0_20px_rgba(239,68,68,0.08)]",
                     isNeutral && "border-border",
                   )}
                 >
@@ -1508,7 +1576,7 @@ export default function LiveSignalsPage() {
                           isVoteUp && "bg-up/10 text-up border-up/25",
                           isVoteDown && "bg-down/10 text-down border-down/25",
                           isVoteWait &&
-                            "bg-secondary text-muted-foreground border-border",
+                          "bg-secondary text-muted-foreground border-border",
                         )}
                       >
                         {isVoteUp && <ArrowUpRight className="w-3.5 h-3.5" />}
@@ -1565,9 +1633,9 @@ export default function LiveSignalsPage() {
                         className={cn(
                           "h-full rounded-full transition-all duration-700",
                           isSatisfied &&
-                            "bg-gradient-to-r from-emerald-500 to-up shadow-[0_0_12px_rgba(0,200,150,0.5)]",
+                          "bg-gradient-to-r from-emerald-500 to-up shadow-[0_0_12px_rgba(0,200,150,0.5)]",
                           isOpposing &&
-                            "bg-gradient-to-r from-rose-500 to-down shadow-[0_0_12px_rgba(240,77,92,0.5)]",
+                          "bg-gradient-to-r from-rose-500 to-down shadow-[0_0_12px_rgba(240,77,92,0.5)]",
                           isNeutral && "bg-muted-foreground/30",
                         )}
                         style={{
@@ -1679,15 +1747,16 @@ export default function LiveSignalsPage() {
                     </tr>
                   ))
                 ) : hasLiveSignals ? (
-                  signalsList.map((sig) => {
+                  signalsList.map((sig, idx) => {
+                    const sigKey = sig.id || `live-sig-${sig.asset || "pair"}-${sig.created_at || idx}`;
                     const isSigUp = sig.direction === "UP";
                     const isSigDown = sig.direction === "DOWN";
                     const isSelected = activeSignal.id === sig.id;
 
                     return (
                       <tr
-                        key={sig.id}
-                        onClick={() => setSelectedSignalId(sig.id)}
+                        key={sigKey}
+                        onClick={() => setSelectedSignalId(sig.id || sigKey)}
                         className={cn(
                           "transition-colors cursor-pointer",
                           isSelected
@@ -1791,14 +1860,14 @@ export default function LiveSignalsPage() {
                                   : undefined);
                               return (
                                 outcome === "Win" ||
-                                outcome === "win" ||
-                                outcome === "WON"
+                                  outcome === "win" ||
+                                  outcome === "WON"
                                   ? "Win"
-                                : outcome === "Loss" ||
-                                  outcome === "loss" ||
-                                  outcome === "LOST"
-                                  ? "Loss"
-                                  : "Pending"
+                                  : outcome === "Loss" ||
+                                    outcome === "loss" ||
+                                    outcome === "LOST"
+                                    ? "Loss"
+                                    : "Pending"
                               );
                             })()}
                           </span>

@@ -21,9 +21,10 @@ export const useRecentSignals = (
   return useQuery({
     queryKey: ["signals", "recent", asset, limit],
     queryFn: () => getRecentSignalsApi({ asset, limit }),
-    refetchInterval: options.refetchInterval ?? 1000,
-    staleTime: options.staleTime ?? 0,
-    refetchIntervalInBackground: options.refetchIntervalInBackground ?? true,
+    refetchInterval: options.refetchInterval ?? false,
+    staleTime: options.staleTime ?? Infinity,
+    refetchIntervalInBackground: options.refetchIntervalInBackground ?? false,
+    refetchOnWindowFocus: options.refetchOnWindowFocus ?? false,
     ...options,
   });
 };
@@ -37,8 +38,9 @@ export const useAttributionStats = (options = {}) => {
   return useQuery({
     queryKey: ["signals", "attribution", "stats"],
     queryFn: () => getAttributionStatsApi(),
-    refetchInterval: options.refetchInterval ?? 10000,
-    staleTime: options.staleTime ?? 8000,
+    refetchInterval: options.refetchInterval ?? false,
+    staleTime: options.staleTime ?? Infinity,
+    refetchOnWindowFocus: options.refetchOnWindowFocus ?? false,
     ...options,
   });
 };
@@ -56,7 +58,9 @@ export const useAttributedOrders = (
   return useQuery({
     queryKey: ["signals", "attribution", "orders", asset, limit],
     queryFn: () => getAttributedOrdersApi({ asset, limit }),
-    refetchInterval: options.refetchInterval ?? 5000,
+    refetchInterval: options.refetchInterval ?? false,
+    staleTime: options.staleTime ?? Infinity,
+    refetchOnWindowFocus: options.refetchOnWindowFocus ?? false,
     ...options,
   });
 };
