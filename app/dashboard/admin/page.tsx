@@ -23,7 +23,11 @@ import {
   PaymentSubmission,
   getPaymentSubmissions,
   approveSubmission,
+  rejectSubmission,
   generate30DayLicenseKey,
+  isStatusApproved,
+  isStatusRejected,
+  isStatusPending,
 } from "@/lib/auth-flow";
 import { cn } from "@/lib/utils";
 
@@ -31,7 +35,7 @@ export default function AdminPage() {
   const [submissions, setSubmissions] = useState<PaymentSubmission[]>([]);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [quickKeyGenerated, setQuickKeyGenerated] = useState<string | null>(null);
-  const [filter, setFilter] = useState<"all" | "pending" | "approved">("all");
+  const [filter, setFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
 
   const refreshData = () => {
     setSubmissions(getPaymentSubmissions());
@@ -50,6 +54,17 @@ export default function AdminPage() {
     }
   };
 
+  const handleReject = (id: string) => {
+    const reason = window.prompt(
+      "Enter rejection note for trader:",
+      "TRX ID not found in Easypaisa ledger or screenshot unclear."
+    );
+    if (reason !== null) {
+      rejectSubmission(id, reason.trim() || undefined);
+      refreshData();
+    }
+  };
+
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
     setCopiedKey(id);
@@ -61,12 +76,14 @@ export default function AdminPage() {
     setQuickKeyGenerated(key);
   };
 
-  const pendingCount = submissions.filter((s) => s.status === "pending").length;
-  const approvedCount = submissions.filter((s) => s.status === "approved").length;
+  const pendingCount = submissions.filter((s) => isStatusPending(s.status)).length;
+  const approvedCount = submissions.filter((s) => isStatusApproved(s.status)).length;
+  const rejectedCount = submissions.filter((s) => isStatusRejected(s.status)).length;
 
   const filteredSubmissions = submissions.filter((sub) => {
-    if (filter === "pending") return sub.status === "pending";
-    if (filter === "approved") return sub.status === "approved";
+    if (filter === "pending") return isStatusPending(sub.status);
+    if (filter === "approved") return isStatusApproved(sub.status);
+    if (filter === "rejected") return isStatusRejected(sub.status);
     return true;
   });
 
@@ -74,6 +91,7 @@ export default function AdminPage() {
     { key: "all", label: "All", count: submissions.length },
     { key: "pending", label: "Pending", count: pendingCount },
     { key: "approved", label: "Approved", count: approvedCount },
+    { key: "rejected", label: "Rejected", count: rejectedCount },
   ] as const;
 
   return (
@@ -210,7 +228,7 @@ export default function AdminPage() {
                             <p className="text-[10px] text-up font-mono">30 Days Fixed</p>
                           </td>
                           <td className="px-4 py-3">
-                            {sub.status === "approved" ? (
+                            {isStatusApproved(sub.status) ? (
                               <div className="space-y-1">
                                 <span className={cn(
                                   "text-[10px] font-bold font-mono px-2 py-0.5 rounded border bg-up/10 text-up border-up/20 inline-block"
@@ -234,6 +252,17 @@ export default function AdminPage() {
                                   </div>
                                 )}
                               </div>
+                            ) : isStatusRejected(sub.status) ? (
+                              <div className="space-y-0.5">
+                                <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded border bg-down/10 text-down border-down/20 inline-block">
+                                  REJECTED
+                                </span>
+                                {sub.rejectionReason && (
+                                  <p className="text-[10px] text-muted-foreground truncate max-w-[180px]">
+                                    {sub.rejectionReason}
+                                  </p>
+                                )}
+                              </div>
                             ) : (
                               <span className={cn(
                                 "text-[10px] font-bold font-mono px-2 py-0.5 rounded border bg-warning/10 text-warning border-warning/20 inline-block"
@@ -243,14 +272,27 @@ export default function AdminPage() {
                             )}
                           </td>
                           <td className="px-4 py-3 text-right">
-                            {sub.status === "pending" ? (
-                              <button
-                                onClick={() => handleApprove(sub.id)}
-                                className="px-3 py-1.5 rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-semibold whitespace-nowrap transition-colors shadow-sm inline-flex items-center gap-1"
-                              >
-                                <CheckCircle2 className="w-3.5 h-3.5" />
-                                Approve &amp; Issue Key
-                              </button>
+                            {isStatusPending(sub.status) ? (
+                              <div className="inline-flex items-center gap-1.5 justify-end">
+                                <button
+                                  onClick={() => handleApprove(sub.id)}
+                                  className="px-2.5 py-1.5 rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-semibold whitespace-nowrap transition-colors shadow-sm inline-flex items-center gap-1"
+                                >
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  Approve
+                                </button>
+                                <button
+                                  onClick={() => handleReject(sub.id)}
+                                  className="px-2.5 py-1.5 rounded-lg bg-down/10 hover:bg-down/20 text-down border border-down/30 text-xs font-semibold whitespace-nowrap transition-colors inline-flex items-center gap-1"
+                                >
+                                  <AlertCircle className="w-3.5 h-3.5" />
+                                  Reject
+                                </button>
+                              </div>
+                            ) : isStatusRejected(sub.status) ? (
+                              <span className="text-[11px] font-mono text-down">
+                                Audit Rejected
+                              </span>
                             ) : (
                               <span className="text-[11px] font-mono text-muted-foreground">
                                 Active ({sub.expiresAt || "30 days"})

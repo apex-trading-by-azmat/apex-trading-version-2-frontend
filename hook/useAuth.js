@@ -1,4 +1,8 @@
 /**
  * Auth Module Hooks
  */
-export { useLogin, default } from "./useLogin";
+export { useLogin } from "./useLogin";
+export { useRegister } from "./useRegister";
+export { useSubmitPayment } from "./useSubmitPayment";
+export { useEasypaisaInfo } from "./useEasypaisaInfo";
+export { default } from "./useLogin";

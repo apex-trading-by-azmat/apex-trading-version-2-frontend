@@ -1,3 +1,23 @@
+export type PaymentStatus = "PENDING" | "APPROVED" | "REJECTED" | "pending" | "approved" | "rejected" | string;
+
+export function isStatusApproved(status?: string | null): boolean {
+  if (!status) return false;
+  const s = String(status).trim().toUpperCase();
+  return s === "APPROVED" || s === "ACTIVE" || s === "VERIFIED" || s === "CONFIRMED";
+}
+
+export function isStatusRejected(status?: string | null): boolean {
+  if (!status) return false;
+  const s = String(status).trim().toUpperCase();
+  return s === "REJECTED" || s === "DECLINED" || s === "FAILED";
+}
+
+export function isStatusPending(status?: string | null): boolean {
+  if (!status) return true;
+  const s = String(status).trim().toUpperCase();
+  return s === "PENDING" || s === "PENDING_APPROVAL" || s === "PENDING_PAYMENT" || s === "WAITING" || s === "UNDER_REVIEW";
+}
+
 export interface PaymentSubmission {
   id: string;
   name: string;
@@ -6,9 +26,10 @@ export interface PaymentSubmission {
   senderPhone: string;
   transactionId: string;
   amount: string;
-  status: "pending" | "approved" | "rejected";
+  status: PaymentStatus;
   submittedAt: string;
   screenshotName?: string;
+  rejectionReason?: string;
   licenseKey?: string;
   expiresAt?: string;
 }
@@ -113,7 +134,7 @@ export function approveSubmission(id: string): { submission: PaymentSubmission; 
   const expiryDate = new Date();
   expiryDate.setDate(expiryDate.getDate() + 30);
 
-  target.status = "approved";
+  target.status = "APPROVED";
   target.licenseKey = key;
   target.expiresAt = expiryDate.toISOString().split("T")[0];
 
@@ -125,6 +146,24 @@ export function approveSubmission(id: string): { submission: PaymentSubmission; 
   localStorage.setItem("apex_latest_approved_email", target.email);
 
   return { submission: target, licenseKey: key };
+}
+
+export function rejectSubmission(
+  id: string,
+  reason: string = "Transaction ID was not found in Easypaisa account ledger or screenshot is invalid."
+): PaymentSubmission | null {
+  if (typeof window === "undefined") return null;
+  const list = getPaymentSubmissions();
+  const target = list.find((item) => item.id === id);
+  if (!target) return null;
+
+  target.status = "REJECTED";
+  target.rejectionReason = reason;
+
+  localStorage.setItem("apex_payment_submissions", JSON.stringify(list));
+  window.dispatchEvent(new Event("apex_submissions_updated"));
+
+  return target;
 }
 
 export function getActiveLicense(): ActiveLicense {
