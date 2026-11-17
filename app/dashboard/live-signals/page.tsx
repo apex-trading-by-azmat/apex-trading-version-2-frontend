@@ -25,6 +25,8 @@ import {
   TrendingUp,
   TrendingDown,
   PauseCircle,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import { cn, formatToUTC5 } from "@/lib/utils";
 import {
@@ -118,6 +120,13 @@ const WAIT_SIGNAL: SignalData = {
       reason_code: "NONE",
       eligible: true,
     },
+    {
+      strategy_name: "BOLLINGER_BANDS_BREAKOUT",
+      direction: "WAIT",
+      confidence_score: 0,
+      reason_code: "BB_NO_BREAKOUT",
+      eligible: true,
+    },
   ],
 };
 
@@ -129,6 +138,15 @@ function formatStrategyName(name: string): string {
       return "Support & Resistance Reversal";
     case "EMA_RSI_PULLBACK":
       return "EMA Trend + RSI Pullback";
+    case "BOLLINGER_BANDS_BREAKOUT":
+    case "BOLLINGER_BREAKOUT":
+    case "BOLLINGER_BANDS":
+      return "Bollinger Bands Breakout";
+    case "MACD_MOMENTUM":
+    case "MACD_MOMENTUM_CONFIRMATION":
+      return "MACD Momentum Confirmation";
+    case "STOCHASTIC_REVERSAL":
+      return "Stochastic Reversal";
     default:
       return name ? name.replace(/_/g, " ") : "Strategy";
   }
@@ -154,6 +172,12 @@ function formatReasonCode(code: string): string {
       return "Bullish Pullback on EMA & RSI";
     case "EMA_RSI_BEARISH_PULLBACK":
       return "Bearish Breakdown below EMA 20";
+    case "BB_NO_BREAKOUT":
+      return "No Volatility Breakout";
+    case "BB_UPPER_BREAKOUT":
+      return "Upper Band Volatility Breakout";
+    case "BB_LOWER_BREAKOUT":
+      return "Lower Band Volatility Breakdown";
     case "NONE":
       return "Standby / No Trigger";
     default:
@@ -797,12 +821,18 @@ export default function LiveSignalsPage() {
     return WAIT_SIGNAL.votes || [];
   }, [activeSignal]);
 
-  // Guaranteed 3 strategies array for consistent display
-  const threeStrategiesList = useMemo(() => {
+  // Guaranteed 4 strategies array for consistent display
+  const fourStrategiesList = useMemo(() => {
+    // If backend provided votes or strategy_breakdown with 4 or more, use all of them!
+    if (votesList.length >= 4) {
+      return votesList;
+    }
+
     const knownKeys = [
       "CANDLESTICK_PRICE_ACTION",
       "SR_REVERSAL",
       "EMA_RSI_PULLBACK",
+      "BOLLINGER_BANDS_BREAKOUT",
     ];
 
     const matched = knownKeys.map((key) => {
@@ -811,7 +841,9 @@ export default function LiveSignalsPage() {
           (v) =>
             v.strategy_name === key ||
             v.strategy_name?.toUpperCase().replace(/_/g, "") ===
-              key.replace(/_/g, ""),
+              key.replace(/_/g, "") ||
+            (key.includes("BOLLINGER") &&
+              v.strategy_name?.toUpperCase().includes("BOLLINGER")),
         ) || null
       );
     });
@@ -827,10 +859,6 @@ export default function LiveSignalsPage() {
           eligible: true,
         };
       });
-    }
-
-    if (votesList.length >= 3) {
-      return votesList.slice(0, 3);
     }
 
     return knownKeys.map((key, idx) => {
@@ -893,9 +921,9 @@ export default function LiveSignalsPage() {
   return (
     <AppShell
       title="Live Signals"
-      description="Real-time 60-second fixed expiry signal engine powered by 3 independent strategies."
+      description="Real-time 60-second fixed expiry signal engine powered by 4 independent strategies."
     >
-      <div className="space-y-6 relative w-full max-w-full min-w-0">
+      <div className="space-y-4 relative w-full max-w-full min-w-0">
         {/* Full-screen Win / Loss Celebration Modal */}
         <TradeOutcomeModal
           outcome={outcomeModal}
@@ -913,7 +941,7 @@ export default function LiveSignalsPage() {
           onClose={() => setOutcomeModal(null)}
         />
 
-        {/* ── LIVE SIGNALS STREAM SLIDER (Shadcn Slider Component) ── */}
+        {/* ── LIVE SIGNALS STREAM SLIDER (WATCHLIST TICKER) ── */}
         <LiveSignalsSlider
           signals={displaySignals}
           activeSignalId={activeSignal.id}
@@ -924,887 +952,566 @@ export default function LiveSignalsPage() {
         />
 
         {/* ══════════════════════════════════════════════════════════════
-            HERO SIGNAL COMMAND CENTER (WITH INTEGRATED TELEMETRY)
+            HERO SIGNAL COCKPIT (THE 3-COLUMN UNIFIED COMMAND CENTER)
         ══════════════════════════════════════════════════════════════ */}
         <section
           className={cn(
-            "relative rounded-2xl border p-6 sm:p-8 lg:p-10 transition-all duration-300 overflow-hidden",
-            isUp &&
-            "bg-gradient-to-br from-up/15 via-card to-background border-up/40 shadow-[0_0_50px_rgba(0,200,150,0.12)]",
-            isDown &&
-            "bg-gradient-to-br from-down/15 via-card to-background border-down/40 shadow-[0_0_50px_rgba(240,77,92,0.12)]",
-            isWait &&
-            "bg-gradient-to-br from-secondary/50 via-card to-background border-border shadow-[0_0_30px_rgba(122,139,160,0.06)]",
+            "relative rounded-2xl border p-5 sm:p-6 lg:p-7 overflow-hidden transition-all duration-300 shadow-xl",
+            isUp && "bg-gradient-to-br from-up/10 via-card to-background border-up/40 shadow-[0_0_50px_rgba(16,185,129,0.12)]",
+            isDown && "bg-gradient-to-br from-down/10 via-card to-background border-down/40 shadow-[0_0_50px_rgba(244,63,94,0.12)]",
+            isWait && "bg-card border-border shadow-sm",
           )}
         >
-          {/* Top Ambient Light Strip */}
+          {/* Subtle Top Ambient Neon Glow Line */}
           <div
             className={cn(
-              "absolute inset-x-0 top-0 h-1.5",
-              isUp && "bg-up",
-              isDown && "bg-down",
-              isWait && "bg-muted-foreground/40",
+              "absolute inset-x-0 top-0 h-1",
+              isUp && "bg-gradient-to-r from-up/20 via-up to-up/20",
+              isDown && "bg-gradient-to-r from-down/20 via-down to-down/20",
+              isWait && "bg-gradient-to-r from-transparent via-primary/30 to-transparent",
             )}
           />
 
-          {/* Historical Inspection Notice (Shown when user manually clicks a previous signal) */}
+          {/* Historical Inspection Alert Bar */}
           {selectedSignalId && (
-            <div className="mb-6 flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl bg-primary/10 border border-primary/25 text-xs">
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl bg-primary/10 border border-primary/25 text-xs">
               <div className="flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-primary shrink-0" />
                 <span className="font-mono text-foreground">
-                  Inspecting Historical Signal:{" "}
-                  <strong>{activeSignal.asset}</strong> (
-                  {activeSignal.direction})
+                  Inspecting Historical Telemetry: <strong>{activeSignal.asset}</strong> ({activeSignal.direction})
                 </span>
                 <span className="text-[11px] font-mono text-muted-foreground hidden sm:inline">
-                  •{" "}
-                  {activeSignal.created_at
-                    ? `${formatToUTC5(activeSignal.created_at)} (UTC+5)`
-                    : ""}
+                  • {activeSignal.created_at ? `${formatToUTC5(activeSignal.created_at)} UTC+5` : ""}
                 </span>
               </div>
               <button
                 type="button"
                 onClick={() => setSelectedSignalId(null)}
-                className="px-2.5 py-1 rounded-md bg-secondary hover:bg-secondary/80 text-foreground font-mono text-xs border border-border cursor-pointer transition-all"
+                className="px-2.5 py-1 rounded-lg bg-surface-2 hover:bg-surface-3 text-foreground font-mono text-xs border border-border cursor-pointer transition-all"
               >
                 ✕ Return to Live Wait State
               </button>
             </div>
           )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-            {/* ── LEFT: GIGANTIC SIGNAL DIRECTION, TELEMETRY & HERO TEXT (7 COLS) ── */}
-            <div className="lg:col-span-7 space-y-6">
-              <div className="flex flex-wrap items-center gap-2.5">
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-card border border-border shadow-sm">
+          {/* Main 3-Column Cockpit Layout */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
+
+            {/* ── COL 1: DIRECTION & CONVICTION PANEL (4 COLS) ── */}
+            <div className="lg:col-span-4 rounded-xl bg-surface-1 border border-border p-4 sm:p-5 flex flex-col justify-between gap-4">
+              {/* Asset Header */}
+              <div className="flex items-center justify-between gap-2 border-b border-border/70 pb-3">
+                <div className="flex items-center gap-2">
                   <DualFlagIcon base={base} quote={quote} size="sm" />
-                  <span className="font-mono font-bold text-xs text-foreground">
+                  <span className="font-mono font-bold text-sm text-foreground">
                     {base}/{quote}
                   </span>
                   <span
                     className={cn(
                       "text-[9px] font-mono px-2 py-0.5 rounded font-bold uppercase",
                       isOtc
-                        ? "bg-purple-900/30 text-purple-300 border border-purple-500/30"
-                        : "bg-blue-900/30 text-blue-300 border border-blue-500/30",
+                        ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
+                        : "bg-primary/15 text-primary border border-primary/30",
                     )}
                   >
                     {marketType}
                   </span>
                 </div>
 
-                <span
-                  className={cn(
-                    "text-xs font-mono font-bold px-3 py-1.5 rounded-lg uppercase tracking-wider border shrink-0",
-                    isUp && "bg-up/10 text-up border-up/30",
-                    isDown && "bg-down/10 text-down border-down/30",
-                    isWait &&
-                    "bg-secondary text-muted-foreground border-border",
-                  )}
-                >
-                  {isWait
-                    ? "STANDBY STATE"
-                    : !isWindowOpen
-                      ? "IN-TRADE EXPIRY PHASE"
-                      : activeSignal.status_code?.replace(/_/g, " ") ||
-                      "QUALIFIED SIGNAL"}
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded font-bold uppercase bg-surface-2 text-muted-foreground border border-border">
+                  60s Expiry
                 </span>
-
-                <span className="text-xs font-mono text-primary bg-primary/10 border border-primary/20 px-3 py-1.5 rounded-lg">
-                  60-Second Fixed Expiry
-                </span>
-
-                {isWait ? (
-                  <span className="text-xs font-mono font-bold text-muted-foreground bg-secondary border border-border px-3 py-1.5 rounded-lg flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-                    Status: Standby (Wait)
-                  </span>
-                ) : isWindowOpen ? (
-                  <span className="text-xs font-mono font-bold text-up bg-up/10 border border-up/30 px-3 py-1.5 rounded-lg flex items-center gap-1.5 animate-pulse">
-                    <Unlock className="w-3.5 h-3.5" />
-                    Window: OPEN (30s)
-                  </span>
-                ) : (
-                  <span className="text-xs font-mono font-bold text-warning bg-warning/15 border border-warning/40 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
-                    <Lock className="w-3.5 h-3.5" />
-                    Window: LOCKED (Rest 30s)
-                  </span>
-                )}
               </div>
 
-              {/* Huge Direction Icon Box */}
-              <div className="flex items-center gap-6">
+              {/* Huge Direction Hero */}
+              <div
+                className={cn(
+                  "p-4 rounded-xl border flex items-center gap-4 transition-all duration-300",
+                  isUp && "bg-up/10 border-up/40 text-up shadow-[0_0_25px_rgba(16,185,129,0.2)]",
+                  isDown && "bg-down/10 border-down/40 text-down shadow-[0_0_25px_rgba(244,63,94,0.2)]",
+                  isWait && "bg-surface-2/60 border-border text-muted-foreground",
+                )}
+              >
                 <div
                   className={cn(
-                    "w-24 h-24 sm:w-28 sm:h-28 rounded-3xl flex items-center justify-center border shrink-0 transition-transform duration-200 shadow-lg",
-                    isUp &&
-                    "bg-up/20 border-up/60 text-up shadow-[0_0_40px_rgba(0,200,150,0.3)]",
-                    isDown &&
-                    "bg-down/20 border-down/60 text-down shadow-[0_0_40px_rgba(239,68,68,0.3)]",
-                    isWait &&
-                    "bg-surface-3 border-border text-muted-foreground shadow-xs",
+                    "w-16 h-16 rounded-xl flex items-center justify-center border shrink-0 transition-transform duration-300 shadow-md",
+                    isUp && "bg-up/25 border-up/60 text-up",
+                    isDown && "bg-down/25 border-down/60 text-down",
+                    isWait && "bg-surface-3 border-border text-muted-foreground",
                   )}
                 >
-                  {isUp && (
-                    <ArrowUpRight className="w-10 h-10 sm:w-12 sm:h-12" />
-                  )}
-                  {isDown && (
-                    <ArrowDownRight className="w-10 h-10 sm:w-12 sm:h-12" />
-                  )}
-                  {isWait && (
-                    <PauseCircle className="w-10 h-10 sm:w-12 sm:h-12 text-muted-foreground" />
-                  )}
+                  {isUp && <ArrowUpRight className="w-8 h-8" />}
+                  {isDown && <ArrowDownRight className="w-8 h-8" />}
+                  {isWait && <PauseCircle className="w-8 h-8" />}
                 </div>
 
-                <div>
-                  <div className="flex items-baseline gap-3">
-                    <h2
+                <div className="min-w-0">
+                  <div className="flex items-baseline gap-2">
+                    <span
                       className={cn(
-                        "text-5xl sm:text-7xl font-black font-mono tracking-tight leading-none",
+                        "text-3xl sm:text-4xl font-black font-mono tracking-tight",
                         isUp && "text-up",
                         isDown && "text-down",
                         isWait && "text-muted-foreground",
                       )}
                     >
                       {activeSignal.direction}
-                    </h2>
-                    <span className="text-lg sm:text-xl font-mono text-muted-foreground font-semibold">
-                      {isWait ? "STATE" : "DIRECTION"}
+                    </span>
+                    <span className="text-xs font-mono text-muted-foreground font-semibold">
+                      {isWait ? "STANDBY" : "SIGNAL"}
                     </span>
                   </div>
 
                   <p
                     className={cn(
-                      "text-sm sm:text-base font-bold font-mono tracking-wider mt-2",
+                      "text-xs font-bold font-mono tracking-wide mt-1 truncate",
                       isUp && "text-up",
                       isDown && "text-down",
                       isWait && "text-muted-foreground",
                     )}
                   >
-                    ACTION:{" "}
                     {isWait
-                      ? "WAIT / NO TRADE"
+                      ? "WAIT / SCANNING TICKS"
                       : isWindowOpen
-                        ? isUp
-                          ? "CALL / HIGHER (BUY)"
-                          : "PUT / LOWER (SELL)"
-                        : isUp
-                          ? "CALL IN PROGRESS (Awaiting :00 Expiry)"
-                          : "PUT IN PROGRESS (Awaiting :00 Expiry)"}
+                      ? isUp
+                        ? "CALL / HIGHER (BUY)"
+                        : "PUT / LOWER (SELL)"
+                      : isUp
+                      ? "CALL RUNNING (Awaiting Expiry)"
+                      : "PUT RUNNING (Awaiting Expiry)"}
                   </p>
                 </div>
               </div>
 
-              {/* ── 3 BEACON STRATEGIES EVALUATION (GREEN WHEN SATISFIED) ── */}
-              <div className="p-4 sm:p-5 rounded-xl bg-card border border-border shadow-sm space-y-3">
-                <div className="flex items-center justify-between border-b border-border/60 pb-2.5">
-                  <span className="text-primary font-semibold uppercase font-mono text-xs flex items-center gap-1.5">
-                    <Layers className="w-3.5 h-3.5" />
-                    3 Strategies Evaluation
-                  </span>
-                  <span className="text-[11px] font-mono text-muted-foreground">
-                    {isWait
-                      ? "0 of 3 Strategies Satisfied"
-                      : `${activeSignal.consensus_count || threeStrategiesList.filter((v) => v.direction === activeSignal.direction).length} of 3 Strategies Satisfied`}
-                  </span>
-                </div>
-
-                {/* 3 Strategies List View */}
-                <div className="flex flex-col gap-2">
-                  {threeStrategiesList.map((vote, idx) => {
-                    const isSatisfied =
-                      !isWait &&
-                      (vote.direction === activeSignal.direction ||
-                        (activeSignal as any).qualifying_strategy === vote.strategy_name) &&
-                      (vote.confidence_score > 0 || activeSignal.is_qualified);
-
-                    const isOpposing =
-                      !isWait &&
-                      !isSatisfied &&
-                      vote.direction !== "WAIT" &&
-                      vote.direction !== activeSignal.direction;
-
-                    return (
-                      <div
-                        key={vote.strategy_name || idx}
-                        className={cn(
-                          "px-3.5 py-2.5 rounded-lg border transition-all duration-200 flex items-center justify-between gap-3 relative overflow-hidden",
-                          isSatisfied
-                            ? "bg-emerald-500/15 border-emerald-500/60 shadow-[0_0_20px_rgba(16,185,129,0.2)] ring-1 ring-emerald-500/40"
-                            : isOpposing
-                            ? "bg-rose-500/5 border-rose-500/30"
-                            : "bg-secondary/40 border-border"
-                        )}
-                      >
-                        {/* Left: Number + Strategy Name + Reason/Status */}
-                        <div className="flex items-center gap-3 min-w-0">
-                          <span
-                            className={cn(
-                              "w-5 h-5 rounded flex items-center justify-center font-mono font-bold text-[10px] border shrink-0",
-                              isSatisfied
-                                ? "bg-emerald-500/25 text-emerald-400 border-emerald-500/50"
-                                : "bg-secondary text-primary border-border"
-                            )}
-                          >
-                            0{idx + 1}
-                          </span>
-
-                          <div className="min-w-0">
-                            <p
-                              className={cn(
-                                "text-xs font-semibold leading-tight truncate",
-                                isSatisfied ? "text-emerald-300 font-bold" : "text-foreground"
-                              )}
-                              title={formatStrategyName(vote.strategy_name)}
-                            >
-                              {formatStrategyName(vote.strategy_name)}
-                            </p>
-                            <p
-                              className={cn(
-                                "text-[10px] font-mono mt-0.5 truncate",
-                                isSatisfied
-                                  ? "text-emerald-400/90 font-medium"
-                                  : isOpposing
-                                  ? "text-rose-400/90"
-                                  : "text-muted-foreground"
-                              )}
-                            >
-                              {isSatisfied
-                                ? formatReasonCode(vote.reason_code) || `Voted ${vote.direction}`
-                                : isOpposing
-                                ? `Voted ${vote.direction} (${vote.confidence_score}%)`
-                                : isWait
-                                ? "Scanning Ticks"
-                                : "No Trigger"}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Right: Satisfaction Badge */}
-                        <div className="shrink-0">
-                          {isSatisfied ? (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-mono font-bold bg-emerald-500/25 text-emerald-400 border border-emerald-500/50">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                              Satisfied
-                            </span>
-                          ) : isOpposing ? (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-mono font-medium bg-rose-500/15 text-rose-400 border border-rose-500/30">
-                              <XCircle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
-                              Opposing
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-mono font-medium bg-secondary text-muted-foreground border border-border">
-                              <Clock className="w-3.5 h-3.5 text-subtle shrink-0" />
-                              Standby
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* ── KEY TRADE TELEMETRY (BROKER PAYOUT, ENTRY BASELINE, TARGET STRIKE) ── */}
-              <div className="grid grid-cols-3 gap-3 pt-1">
-                <div className="p-3 sm:p-3.5 rounded-xl bg-card border border-border shadow-sm">
-                  <span className="text-[10px] font-mono text-muted-foreground uppercase block tracking-wider font-semibold">
-                    Broker Payout
-                  </span>
-                  <div className="flex items-baseline gap-1.5 mt-1">
-                    <span
-                      className={cn(
-                        "text-xl sm:text-2xl font-black font-mono",
-                        isWait ? "text-muted-foreground" : "text-up",
-                      )}
-                    >
-                      {activeSignal.broker_payout
-                        ? `${activeSignal.broker_payout}%`
-                        : isWait
-                          ? "—"
-                          : "85%"}
-                    </span>
-                    {!isWait && activeSignal.broker_payout && (
-                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-up/10 text-up border border-up/20 uppercase font-bold">
-                        Profit
-                      </span>
-                    )}
-                  </div>
-                  <span className="text-[10px] font-mono text-muted-foreground mt-0.5 block">
-                    {isWait ? "Standby" : "Active Broker Margin"}
-                  </span>
-                </div>
-
-                <div className="p-3 sm:p-3.5 rounded-xl bg-card border border-border shadow-sm">
-                  <span className="text-[10px] font-mono text-muted-foreground uppercase block tracking-wider font-semibold">
-                    Entry Baseline
+              {/* Real-time Telemetry (Broker Payout, Entry Baseline, Target Strike) */}
+              <div className="grid grid-cols-3 gap-2 pt-1 border-t border-border/70">
+                <div className="p-2.5 rounded-lg bg-surface-2/60 border border-border/70 text-center">
+                  <span className="text-[9px] font-mono text-muted-foreground uppercase tracking-wider block">
+                    Payout
                   </span>
                   <span
                     className={cn(
-                      "text-xl sm:text-2xl font-black font-mono mt-1 block truncate",
-                      isWait ? "text-muted-foreground" : "text-primary",
+                      "text-sm font-bold font-mono block mt-0.5",
+                      isWait ? "text-muted-foreground" : "text-up",
                     )}
                   >
-                    {activeSignal.entry_baseline ??
-                      activeSignal.spot_price ??
-                      (isWait ? "—" : "0.00000")}
+                    {activeSignal.broker_payout ? `${activeSignal.broker_payout}%` : isWait ? "—" : "85%"}
                   </span>
-                  <span className="text-[10px] font-mono text-muted-foreground mt-0.5 block">
-                    {isWait ? "Pending Setup" : "Execution Reference"}
+                  <span className="text-[9px] font-mono text-muted-foreground block truncate">
+                    {isWait ? "Standby" : "Margin"}
                   </span>
                 </div>
 
-                <div className="p-3 sm:p-3.5 rounded-xl bg-card border border-border shadow-sm">
-                  <span className="text-[10px] font-mono text-muted-foreground uppercase block tracking-wider font-semibold">
-                    Target Strike
+                <div className="p-2.5 rounded-lg bg-surface-2/60 border border-border/70 text-center">
+                  <span className="text-[9px] font-mono text-muted-foreground uppercase tracking-wider block">
+                    Baseline
                   </span>
                   <span
                     className={cn(
-                      "text-xl sm:text-2xl font-black font-mono mt-1 block truncate",
-                      isUp
-                        ? "text-up"
-                        : isDown
-                          ? "text-down"
-                          : "text-muted-foreground",
+                      "text-sm font-bold font-mono block mt-0.5 truncate",
+                      isWait ? "text-muted-foreground" : "text-primary",
                     )}
+                    title={String(activeSignal.entry_baseline ?? activeSignal.spot_price ?? "0.00000")}
+                  >
+                    {activeSignal.entry_baseline ?? activeSignal.spot_price ?? (isWait ? "—" : "0.00000")}
+                  </span>
+                  <span className="text-[9px] font-mono text-muted-foreground block truncate">
+                    {isWait ? "Pending" : "Spot Price"}
+                  </span>
+                </div>
+
+                <div className="p-2.5 rounded-lg bg-surface-2/60 border border-border/70 text-center">
+                  <span className="text-[9px] font-mono text-muted-foreground uppercase tracking-wider block">
+                    Target
+                  </span>
+                  <span
+                    className={cn(
+                      "text-sm font-bold font-mono block mt-0.5 truncate",
+                      isUp ? "text-up" : isDown ? "text-down" : "text-muted-foreground",
+                    )}
+                    title={String(activeSignal.target_strike ?? "0.00000")}
                   >
                     {activeSignal.target_strike ?? (isWait ? "—" : "0.00000")}
                   </span>
-                  <span className="text-[10px] font-mono text-muted-foreground mt-0.5 block">
-                    {isWait
-                      ? "Pending Analysis"
-                      : isUp
-                        ? "Higher Strike (> Entry)"
-                        : "Lower Strike (< Entry)"}
+                  <span className="text-[9px] font-mono text-muted-foreground block truncate">
+                    {isWait ? "Pending" : isUp ? "> Baseline" : "< Baseline"}
                   </span>
                 </div>
               </div>
             </div>
 
-            {/* ── RIGHT: TIMER & 3-STRATEGY CONSENSUS METRICS (5 COLS) ── */}
-            <div className="lg:col-span-5 space-y-4">
-              <div
-                className={cn(
-                  "p-5 rounded-xl border transition-all duration-300 space-y-3.5 shadow-sm",
-                  isWait
-                    ? "bg-card border-border"
-                    : isWindowOpen
-                      ? "bg-primary/5 border-primary/20"
-                      : "bg-warning/10 border-warning/40 shadow-[0_0_30px_rgba(245,166,35,0.12)]",
-                )}
-              >
-                <div className="flex items-center justify-between">
-                  <span
-                    className={cn(
-                      "text-xs font-mono uppercase tracking-wider flex items-center gap-1.5 font-bold",
-                      isWait
-                        ? "text-muted-foreground"
-                        : isWindowOpen
-                          ? "text-muted-foreground"
-                          : "text-warning",
-                    )}
-                  >
-                    <Clock
-                      className={cn(
-                        "w-4 h-4",
-                        isWait
-                          ? "text-muted-foreground"
-                          : isWindowOpen
-                            ? "text-primary"
-                            : "text-warning",
-                      )}
-                    />
-                    {isWait
-                      ? `Cadence: M1 Candle Pulse • UTC+5: ${utc5TimeDisplay}`
-                      : isWindowOpen
-                        ? `Trading Window: Open (60s → 31s) • UTC+5: ${utc5TimeDisplay}`
-                        : `Trading Window: Closed (30s → 00s) • UTC+5: ${utc5TimeDisplay}`}
-                  </span>
-
-                  <span
-                    className={cn(
-                      "text-[10px] font-mono px-2 py-0.5 rounded font-bold uppercase border",
-                      isWait
-                        ? "bg-secondary text-muted-foreground border-border"
-                        : isWindowOpen
-                          ? "bg-up/15 text-up border-up/30"
-                          : "bg-warning/20 text-warning border-warning/40 animate-pulse",
-                    )}
-                  >
-                    {isWait
-                      ? "STANDBY"
-                      : isWindowOpen
-                        ? "ENTER NOW"
-                        : "LOCKED / WAIT"}
-                  </span>
-                </div>
-
-                <div className="flex items-baseline justify-between pt-1">
-                  <div>
-                    <span
-                      className={cn(
-                        "text-5xl sm:text-6xl font-black font-mono transition-colors",
-                        isWait
-                          ? "text-foreground"
-                          : isWindowOpen
-                            ? "text-foreground"
-                            : "text-warning",
-                      )}
-                    >
-                      {String(secondsRemaining).padStart(2, "0")}s
-                    </span>
-                    <span
-                      className={cn(
-                        "text-xs ml-2 font-mono font-semibold block sm:inline mt-1 sm:mt-0",
-                        isWait
-                          ? "text-muted-foreground"
-                          : isWindowOpen
-                            ? "text-up"
-                            : "text-warning",
-                      )}
-                    >
-                      {isWait
-                        ? `• 60s Candle Sync (${secondsRemaining > 30 ? "Entry Phase" : "Lockout Phase"})`
-                        : isWindowOpen
-                          ? "• Window Open (60s → 31s)"
-                          : "• Window Locked (30s → 00s)"}
-                    </span>
-                  </div>
-
-                  <span
-                    className={cn(
-                      "text-xs font-mono font-bold px-2.5 py-1 rounded border",
-                      isWait
-                        ? "bg-secondary text-muted-foreground border-border"
-                        : isWindowOpen
-                          ? "bg-up/10 text-up border-up/30"
-                          : "bg-warning/20 text-warning border-warning/40 animate-pulse",
-                    )}
-                  >
-                    {isWait
-                      ? "Phase: Monitoring"
-                      : isWindowOpen
-                        ? "Window: Open"
-                        : "Phase: Yellow Lock"}
-                  </span>
-                </div>
-
-                {/* Progress bar */}
-                <div className="space-y-1.5">
-                  <div className="w-full h-3 rounded-full bg-secondary overflow-hidden flex border border-border">
-                    <div className="w-1/2 h-full relative border-r border-background">
-                      <div
-                        className={cn(
-                          "h-full transition-all duration-1000",
-                          isWait
-                            ? "bg-muted-foreground/30"
-                            : isWindowOpen
-                              ? isUp
-                                ? "bg-up"
-                                : isDown
-                                  ? "bg-down"
-                                  : "bg-muted-foreground"
-                              : "bg-up/40",
-                        )}
-                        style={{
-                          width: isWait
-                            ? `${Math.round(((60 - secondsRemaining) / 60) * 100)}%`
-                            : isWindowOpen
-                              ? `${Math.round(((60 - secondsRemaining) / 30) * 100)}%`
-                              : "100%",
-                        }}
-                      />
-                    </div>
-                    <div className="w-1/2 h-full relative">
-                      <div
-                        className={cn(
-                          "h-full transition-all duration-1000",
-                          isWait
-                            ? "bg-muted-foreground/20"
-                            : "bg-warning shadow-[0_0_12px_rgba(245,166,35,0.4)]",
-                        )}
-                        style={{
-                          width: isWait
-                            ? "0%"
-                            : !isWindowOpen
-                              ? `${Math.round(((30 - secondsRemaining) / 30) * 100)}%`
-                              : "0%",
-                        }}
-                      />
-                    </div>
-                  </div>
-                  <div className="flex justify-between text-[10px] font-mono">
-                    <span
-                      className={cn(
-                        isWait
-                          ? "text-muted-foreground font-medium"
-                          : isWindowOpen
-                            ? "text-up font-bold"
-                            : "text-muted-foreground",
-                      )}
-                    >
-                      [60s → 31s] Entry Window
-                    </span>
-                    <span
-                      className={cn(
-                        isWait
-                          ? "text-muted-foreground font-medium"
-                          : !isWindowOpen
-                            ? "text-warning font-bold"
-                            : "text-muted-foreground",
-                      )}
-                    >
-                      [30s → 00s] Lockout / Expiry
-                    </span>
-                  </div>
-                </div>
-
-                {/* Window State Banner */}
-                {isWait ? (
-                  <div className="p-2.5 rounded-lg bg-secondary border border-border flex items-center gap-2 text-xs text-muted-foreground">
-                    <Radio className="w-4 h-4 shrink-0 text-emerald-400 animate-pulse" />
-                    <span>
-                      Quotex Telemetry Active — Ingesting ticks & awaiting
-                      qualified setup.
-                    </span>
-                  </div>
-                ) : isWindowOpen ? (
-                  <div className="p-2.5 rounded-lg bg-up/10 border border-up/20 flex items-center gap-2 text-xs text-up">
-                    <Unlock className="w-4 h-4 shrink-0" />
-                    <span>
-                      Trading window is open. Execute trade now during first 30
-                      seconds.
-                    </span>
-                  </div>
-                ) : (
-                  <div className="p-2.5 rounded-lg bg-warning/15 border border-warning/40 flex items-center gap-2 text-xs text-warning">
-                    <AlertTriangle className="w-4 h-4 shrink-0 text-warning" />
-                    <span className="font-semibold">
-                      Window closed (30s to 00s). In-trade expiry phase. Do not
-                      enter new trades.
-                    </span>
-                  </div>
-                )}
+            {/* ── COL 2: 60s CANDLE TIMER & TRADING WINDOW (4 COLS) ── */}
+            <div className="lg:col-span-4 rounded-xl bg-surface-1 border border-border p-4 sm:p-5 flex flex-col justify-between gap-4">
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-border/70 pb-3">
+                <span className="text-xs font-mono font-bold text-foreground flex items-center gap-1.5 uppercase">
+                  <Clock className="w-3.5 h-3.5 text-primary" />
+                  M1 Candle Pulse
+                </span>
+                <span className="text-[11px] font-mono text-muted-foreground">
+                  UTC+5: <strong className="text-foreground">{utc5TimeDisplay}</strong>
+                </span>
               </div>
 
-              {/* Confidence Score & Consensus Metric Cards */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-4 rounded-xl bg-card border border-border shadow-sm">
-                  <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">
-                    Confidence Score
-                  </p>
-                  <div className="flex items-baseline gap-1 mt-1">
-                    <span
-                      className={cn(
-                        "text-3xl font-extrabold font-mono",
-                        activeSignal.confidence_score >= 75
-                          ? "text-up"
-                          : "text-muted-foreground",
-                      )}
-                    >
-                      {activeSignal.confidence_score}
-                    </span>
-                    <span className="text-xs font-mono text-muted-foreground">
-                      / 100
-                    </span>
-                  </div>
-                  <p className="text-[10px] font-mono text-muted-foreground mt-1">
-                    {activeSignal.confidence_score >= 75
-                      ? "Passed (≥ 75 Required)"
-                      : "Sub-75 Standby"}
-                  </p>
+              {/* Giant Digital Chronometer */}
+              <div className="text-center py-2">
+                <div className="inline-flex items-baseline justify-center gap-1">
+                  <span
+                    className={cn(
+                      "text-6xl sm:text-7xl font-black font-mono leading-none tracking-tight",
+                      isWait
+                        ? "text-foreground"
+                        : isWindowOpen
+                        ? "text-foreground"
+                        : "text-warning",
+                    )}
+                  >
+                    {String(secondsRemaining).padStart(2, "0")}
+                  </span>
+                  <span className="text-2xl font-mono text-muted-foreground font-semibold">
+                    s
+                  </span>
                 </div>
 
-                <div className="p-4 rounded-xl bg-card border border-border shadow-sm">
-                  <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">
-                    3-Strategy Consensus
-                  </p>
-                  <p className="text-3xl font-extrabold font-mono text-primary mt-1">
-                    {activeSignal.consensus_count} of 3
-                  </p>
-                  <p className="text-[10px] font-mono text-muted-foreground mt-1">
-                    Threshold: ≥ 2 of 3 Agree
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ══════════════════════════════════════════════════════════════
-            3. THE 3 INDEPENDENT STRATEGIES ANALYSIS MATRIX
-               WITH COMPETENCE METRE & SATISFACTION STATUS
-        ══════════════════════════════════════════════════════════════ */}
-        <section className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div>
-              <h3 className="text-base font-bold text-foreground flex items-center gap-2">
-                <Layers className="w-4 h-4 text-primary" />
-                The 3 Beacon Strategies Matrix ({
-                  activeSignal.consensus_count
-                }{" "}
-                of 3 Satisfied)
-              </h3>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Real-time strategy satisfaction status and competence meters
-                evaluated by the decision engine.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2 text-xs font-mono">
-              <span className="px-2.5 py-1 rounded bg-card border border-border text-muted-foreground">
-                Consensus Target:{" "}
-                <strong className="text-primary">≥ 2 of 3</strong>
-              </span>
-              <span className="px-2.5 py-1 rounded bg-card border border-border text-muted-foreground">
-                Opposition:{" "}
-                <strong className="text-emerald-400">
-                  {activeSignal.opposition_count} Opposing
-                </strong>
-              </span>
-            </div>
-          </div>
-
-          {/* 3 Strategy Cards Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {votesList.map((vote, idx) => {
-              const voteDir = vote.direction || "WAIT";
-              const isVoteUp = voteDir === "UP";
-              const isVoteDown = voteDir === "DOWN";
-              const isVoteWait = voteDir === "WAIT";
-
-              // Check if this strategy satisfied the overall signal
-              const isSatisfied =
-                voteDir === activeSignal.direction && vote.confidence_score > 0;
-              const isOpposing =
-                !isVoteWait && voteDir !== activeSignal.direction;
-              const isNeutral = !isSatisfied && !isOpposing;
-
-              return (
-                <div
-                  key={vote.strategy_name || idx}
+                <p
                   className={cn(
-                    "p-5 rounded-xl border bg-card transition-all flex flex-col justify-between space-y-4 shadow-sm relative overflow-hidden",
-                    isSatisfied &&
-                    "border-up/50 bg-gradient-to-b from-up/10 to-card shadow-[0_0_20px_rgba(0,200,150,0.08)]",
-                    isOpposing &&
-                    "border-down/50 bg-gradient-to-b from-down/10 to-card shadow-[0_0_20px_rgba(239,68,68,0.08)]",
-                    isNeutral && "border-border",
+                    "text-xs font-mono font-bold mt-2",
+                    isWait
+                      ? "text-muted-foreground"
+                      : isWindowOpen
+                      ? "text-up"
+                      : "text-warning",
                   )}
                 >
-                  {/* Top Satisfaction Badge Strip */}
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] font-mono text-muted-foreground flex items-center gap-1">
-                      <span className="w-4 h-4 rounded bg-secondary text-primary flex items-center justify-center font-bold border border-border">
-                        0{idx + 1}
-                      </span>
-                      STRATEGY
-                    </span>
+                  {isWait
+                    ? `60s Candle Sync (${secondsRemaining > 30 ? "Entry Phase" : "Lockout Phase"})`
+                    : isWindowOpen
+                    ? "✓ Trading Window Open (60s → 31s)"
+                    : "⚠ Window Locked / In-Trade Expiry (30s → 00s)"}
+                </p>
+              </div>
 
-                    {/* SATISFACTION STATUS BADGE */}
-                    {isSatisfied && (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-up/15 text-up border border-up/30">
-                        <CheckCircle2 className="w-3 h-3 text-up" />
-                        SATISFIED (Voted {voteDir})
-                      </span>
-                    )}
-                    {isOpposing && (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-down/15 text-down border border-down/30">
-                        <XCircle className="w-3 h-3 text-down" />
-                        OPPOSING ({voteDir})
-                      </span>
-                    )}
-                    {isNeutral && (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-medium bg-secondary text-muted-foreground border border-border">
-                        <Clock className="w-3 h-3 text-subtle" />
-                        NO SETUP ({voteDir})
-                      </span>
-                    )}
+              {/* Dual-Track Visual Progress Bar */}
+              <div className="space-y-1.5">
+                <div className="w-full h-3 rounded-full bg-surface-2 overflow-hidden flex border border-border p-0.5">
+                  {/* First 30s: Entry Window */}
+                  <div className="w-1/2 h-full relative border-r border-background/50">
+                    <div
+                      className={cn(
+                        "h-full rounded-l-full transition-all duration-1000",
+                        isWait
+                          ? "bg-muted-foreground/30"
+                          : isWindowOpen
+                          ? isUp
+                            ? "bg-up shadow-[0_0_10px_rgba(16,185,129,0.5)]"
+                            : isDown
+                            ? "bg-down shadow-[0_0_10px_rgba(244,63,94,0.5)]"
+                            : "bg-primary"
+                          : "bg-up/40",
+                      )}
+                      style={{
+                        width: isWait
+                          ? `${Math.round(((60 - secondsRemaining) / 60) * 100)}%`
+                          : isWindowOpen
+                          ? `${Math.round(((60 - secondsRemaining) / 30) * 100)}%`
+                          : "100%",
+                      }}
+                    />
                   </div>
-
-                  {/* Strategy Title & Direction */}
-                  <div>
-                    <h4 className="text-sm font-bold text-foreground">
-                      {formatStrategyName(vote.strategy_name)}
-                    </h4>
-
-                    <div className="flex items-center gap-2 mt-2">
-                      <span
-                        className={cn(
-                          "inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-mono font-bold border",
-                          isVoteUp && "bg-up/10 text-up border-up/25",
-                          isVoteDown && "bg-down/10 text-down border-down/25",
-                          isVoteWait &&
-                          "bg-secondary text-muted-foreground border-border",
-                        )}
-                      >
-                        {isVoteUp && <ArrowUpRight className="w-3.5 h-3.5" />}
-                        {isVoteDown && (
-                          <ArrowDownRight className="w-3.5 h-3.5" />
-                        )}
-                        {isVoteWait && <Clock className="w-3.5 h-3.5" />}
-                        Vote: {voteDir}
-                      </span>
-
-                      <span className="text-[11px] font-mono text-muted-foreground">
-                        {vote.eligible ? "Active Engine" : "Disabled"}
-                      </span>
-                    </div>
-
-                    {/* Technical Reason Code */}
-                    <div className="mt-3 p-2.5 rounded-lg bg-secondary/60 border border-border/80">
-                      <span className="text-[10px] font-mono text-subtle uppercase block mb-0.5">
-                        TRIGGER REASON:
-                      </span>
-                      <p className="text-xs font-mono text-foreground font-medium">
-                        {formatReasonCode(vote.reason_code)}
-                      </p>
-                      <span className="text-[9px] font-mono text-subtle block mt-0.5">
-                        Code: {vote.reason_code || "NONE"}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* ── COMPETENCE METRE (CONFIDENCE SCORE) ── */}
-                  <div className="space-y-2 pt-2 border-t border-border/60">
-                    <div className="flex justify-between items-center text-xs font-mono">
-                      <span className="text-muted-foreground flex items-center gap-1">
-                        <Gauge className="w-3.5 h-3.5 text-primary" />
-                        Competence Metre
-                      </span>
-                      <span
-                        className={cn(
-                          "font-bold text-sm",
-                          isSatisfied
-                            ? "text-up font-mono"
-                            : isOpposing
-                              ? "text-down font-mono"
-                              : "text-muted-foreground font-mono",
-                        )}
-                      >
-                        {vote.confidence_score} / 100
-                      </span>
-                    </div>
-
-                    {/* Visual Progress Bar */}
-                    <div className="w-full h-2.5 rounded-full bg-secondary overflow-hidden border border-border/80 p-0.5">
-                      <div
-                        className={cn(
-                          "h-full rounded-full transition-all duration-700",
-                          isSatisfied &&
-                          "bg-gradient-to-r from-emerald-500 to-up shadow-[0_0_12px_rgba(0,200,150,0.5)]",
-                          isOpposing &&
-                          "bg-gradient-to-r from-rose-500 to-down shadow-[0_0_12px_rgba(240,77,92,0.5)]",
-                          isNeutral && "bg-muted-foreground/30",
-                        )}
-                        style={{
-                          width: `${Math.max(vote.confidence_score, 0)}%`,
-                        }}
-                      />
-                    </div>
-
-                    <div className="flex justify-between text-[10px] font-mono text-subtle pt-0.5">
-                      <span>Threshold: ≥ 70</span>
-                      <span>
-                        {vote.confidence_score >= 70
-                          ? "✓ High Conviction"
-                          : vote.confidence_score > 0
-                            ? "Moderate"
-                            : "Neutral (0%)"}
-                      </span>
-                    </div>
+                  {/* Second 30s: Lockout Window */}
+                  <div className="w-1/2 h-full relative">
+                    <div
+                      className={cn(
+                        "h-full rounded-r-full transition-all duration-1000",
+                        isWait
+                          ? "bg-muted-foreground/15"
+                          : !isWindowOpen
+                          ? "bg-warning shadow-[0_0_12px_rgba(245,158,11,0.5)]"
+                          : "bg-transparent",
+                      )}
+                      style={{
+                        width: isWait
+                          ? "0%"
+                          : !isWindowOpen
+                          ? `${Math.round(((30 - secondsRemaining) / 30) * 100)}%`
+                          : "0%",
+                      }}
+                    />
                   </div>
                 </div>
-              );
-            })}
+
+                <div className="flex justify-between text-[10px] font-mono text-muted-foreground px-0.5">
+                  <span className={isWindowOpen && !isWait ? "text-up font-bold" : ""}>
+                    [60s → 31s] Entry Window
+                  </span>
+                  <span className={!isWindowOpen && !isWait ? "text-warning font-bold" : ""}>
+                    [30s → 00s] Lockout / Expiry
+                  </span>
+                </div>
+              </div>
+
+              {/* Phase Banner */}
+              <div
+                className={cn(
+                  "p-2.5 rounded-lg border text-xs font-mono flex items-center justify-between gap-2",
+                  isWait
+                    ? "bg-surface-2 text-muted-foreground border-border"
+                    : isWindowOpen
+                    ? "bg-up/10 text-up border-up/30 animate-pulse"
+                    : "bg-warning/15 text-warning border-warning/40",
+                )}
+              >
+                <div className="flex items-center gap-1.5 truncate">
+                  {isWait ? (
+                    <Radio className="w-3.5 h-3.5 text-emerald-400 shrink-0 animate-pulse" />
+                  ) : isWindowOpen ? (
+                    <Unlock className="w-3.5 h-3.5 shrink-0" />
+                  ) : (
+                    <Lock className="w-3.5 h-3.5 shrink-0" />
+                  )}
+                  <span className="truncate font-semibold">
+                    {isWait
+                      ? "Listening to Quotex ticks"
+                      : isWindowOpen
+                      ? "Execute trade on Quotex now"
+                      : "Window locked. Do not enter trades"}
+                  </span>
+                </div>
+
+                <span className="text-[10px] font-bold uppercase shrink-0 px-1.5 py-0.5 rounded bg-background/50 border border-border">
+                  {isWait ? "STANDBY" : isWindowOpen ? "OPEN" : "LOCKED"}
+                </span>
+              </div>
+            </div>
+
+            {/* ── COL 3: 4-STRATEGY INSTITUTIONAL CONSENSUS (LIST VIEW) (4 COLS) ── */}
+            <div className="lg:col-span-4 rounded-xl bg-surface-1 border border-border p-4 sm:p-5 flex flex-col justify-between gap-3">
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-border/70 pb-3">
+                <span className="text-primary font-bold uppercase font-mono text-xs flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5" />
+                  4 Strategies Consensus
+                </span>
+                <span
+                  className={cn(
+                    "text-[11px] font-mono px-2 py-0.5 rounded font-bold border",
+                    isWait
+                      ? "bg-surface-2 text-muted-foreground border-border"
+                      : "bg-primary/10 text-primary border-primary/25",
+                  )}
+                >
+                  {isWait
+                    ? `0 of ${fourStrategiesList.length} Satisfied`
+                    : `${activeSignal.consensus_count || fourStrategiesList.filter((v) => v.direction === activeSignal.direction).length} of ${fourStrategiesList.length} Satisfied`}
+                </span>
+              </div>
+
+              {/* Conviction / Confidence Micro-Meter */}
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs font-mono">
+                  <span className="text-muted-foreground">Confidence Conviction:</span>
+                  <span
+                    className={cn(
+                      "font-bold",
+                      activeSignal.confidence_score >= 75 ? "text-emerald-400" : "text-muted-foreground",
+                    )}
+                  >
+                    {activeSignal.confidence_score}/100 {activeSignal.confidence_score >= 75 ? "✓ Passed" : "(Min 75)"}
+                  </span>
+                </div>
+                <div className="w-full h-1.5 rounded-full bg-surface-2 overflow-hidden border border-border/60">
+                  <div
+                    className={cn(
+                      "h-full rounded-full transition-all duration-500",
+                      activeSignal.confidence_score >= 75 ? "bg-emerald-500" : "bg-muted-foreground/30",
+                    )}
+                    style={{ width: `${Math.max(activeSignal.confidence_score, 0)}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* The 4 Strategies List View */}
+              <div className="flex flex-col gap-2 pt-1">
+                {fourStrategiesList.map((vote, idx) => {
+                  const isSatisfied =
+                    !isWait &&
+                    (vote.direction === activeSignal.direction ||
+                      (activeSignal as any).qualifying_strategy === vote.strategy_name) &&
+                    (vote.confidence_score > 0 || activeSignal.is_qualified);
+
+                  const isOpposing =
+                    !isWait &&
+                    !isSatisfied &&
+                    vote.direction !== "WAIT" &&
+                    vote.direction !== activeSignal.direction;
+
+                  return (
+                    <div
+                      key={vote.strategy_name || idx}
+                      className={cn(
+                        "px-3 py-2.5 rounded-lg border transition-all duration-200 flex items-center justify-between gap-3 relative overflow-hidden",
+                        isSatisfied
+                          ? "bg-emerald-500/15 border-emerald-500/60 shadow-[0_0_15px_rgba(16,185,129,0.18)] ring-1 ring-emerald-500/30"
+                          : isOpposing
+                          ? "bg-rose-500/10 border-rose-500/30"
+                          : "bg-surface-2/60 border-border/80",
+                      )}
+                    >
+                      {/* Left: Number + Strategy Name + Reason */}
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span
+                          className={cn(
+                            "w-5 h-5 rounded flex items-center justify-center font-mono font-bold text-[10px] border shrink-0",
+                            isSatisfied
+                              ? "bg-emerald-500/25 text-emerald-400 border-emerald-500/50"
+                              : "bg-surface-3 text-primary border-border",
+                          )}
+                        >
+                          0{idx + 1}
+                        </span>
+
+                        <div className="min-w-0">
+                          <p
+                            className={cn(
+                              "text-xs font-semibold leading-tight truncate",
+                              isSatisfied ? "text-emerald-300 font-bold" : "text-foreground",
+                            )}
+                            title={formatStrategyName(vote.strategy_name)}
+                          >
+                            {formatStrategyName(vote.strategy_name)}
+                          </p>
+                          <p
+                            className={cn(
+                              "text-[10px] font-mono mt-0.5 truncate",
+                              isSatisfied
+                                ? "text-emerald-400 font-medium"
+                                : isOpposing
+                                ? "text-rose-400"
+                                : "text-muted-foreground",
+                            )}
+                          >
+                            {isSatisfied
+                              ? formatReasonCode(vote.reason_code) || `Voted ${vote.direction}`
+                              : isOpposing
+                              ? `Voted ${vote.direction} (${vote.confidence_score}%)`
+                              : isWait
+                              ? "Scanning Ticks"
+                              : "No Trigger"}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Right: Satisfaction Pill */}
+                      <div className="shrink-0">
+                        {isSatisfied ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/25 text-emerald-400 border border-emerald-500/50">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
+                            Satisfied
+                          </span>
+                        ) : isOpposing ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-rose-500/15 text-rose-400 border border-rose-500/30">
+                            <XCircle className="w-3 h-3 text-rose-400 shrink-0" />
+                            Opposing
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-surface-2 text-muted-foreground border border-border">
+                            <Clock className="w-3 h-3 text-subtle shrink-0" />
+                            Standby
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
           </div>
         </section>
 
+        {/* ── MARKET REGIME & TELEMETRY DIAGNOSTIC STRIP ── */}
+        <div className="px-5 py-3 rounded-xl bg-card border border-border text-xs flex flex-wrap items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-3">
+            <span className="font-mono text-muted-foreground flex items-center gap-1.5">
+              <Activity className="w-3.5 h-3.5 text-primary" />
+              Market Regime:
+              <strong className="text-foreground ml-1">
+                {activeSignal.market_regime?.replace(/_/g, " ") || (isOtc ? "OTC Algorithmic Flow" : "Standard Volatility")}
+              </strong>
+            </span>
+            <span className="text-muted-foreground hidden sm:inline">•</span>
+            <span className="font-mono text-muted-foreground hidden sm:inline">
+              Consensus Rule: <strong className="text-primary">≥ 3 of 4 Agree</strong>
+            </span>
+          </div>
+
+          <div className="flex items-center gap-3 font-mono text-[11px] text-muted-foreground">
+            <span>
+              Opposition:{" "}
+              <strong className={activeSignal.opposition_count === 0 ? "text-emerald-400" : "text-rose-400"}>
+                {activeSignal.opposition_count} Opposing
+              </strong>
+            </span>
+            <span>•</span>
+            <span>
+              Window: <strong className="text-primary">30s Precision</strong>
+            </span>
+          </div>
+        </div>
+
         {/* ══════════════════════════════════════════════════════════════
-            4. REAL-TIME SIGNALS FEED TABLE (GET /signals/recent)
+            REAL-TIME SIGNALS FEED TABLE (GET /signals/recent)
         ══════════════════════════════════════════════════════════════ */}
         <section className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-secondary/30">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-surface-2/40">
             <div className="flex items-center gap-2.5">
               <Database className="w-4 h-4 text-primary" />
               <h3 className="text-sm font-bold text-foreground">
-                Recent Qualified Signals Feed (GET /signals/recent)
+                Recent Qualified Signals Feed
               </h3>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
-                {hasLiveSignals
-                  ? `${signalsList.length} QUALIFIED SIGNALS`
-                  : "MONITORING ACTIVE"}
+                {hasLiveSignals ? `${signalsList.length} QUALIFIED SIGNALS` : "MONITORING ACTIVE"}
               </span>
             </div>
 
             <button
               type="button"
               onClick={() => refetchSignals()}
-              className="text-xs text-primary hover:underline underline-offset-2 flex items-center gap-1 cursor-pointer"
+              className="text-xs text-primary hover:text-primary/80 flex items-center gap-1 font-mono cursor-pointer transition-colors"
             >
-              <RefreshCw
-                className={cn("w-3 h-3", isSignalsFetching && "animate-spin")}
-              />
-              Refresh
+              <RefreshCw className={cn("w-3 h-3", isSignalsFetching && "animate-spin text-primary")} />
+              Sync Feed
             </button>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
-                <tr className="border-b border-border text-subtle font-mono uppercase text-[10px] tracking-wider bg-secondary/20">
+                <tr className="border-b border-border text-muted-foreground font-mono uppercase text-[10px] tracking-wider bg-surface-2/20">
                   <th className="px-6 py-3.5">Asset</th>
                   <th className="px-3 py-3.5">Direction</th>
                   <th className="px-3 py-3.5">Confidence</th>
-                  <th className="px-3 py-3.5">3-Strategy Consensus</th>
+                  <th className="px-3 py-3.5">4-Strategy Consensus</th>
                   <th className="px-3 py-3.5">Entry Baseline</th>
                   <th className="px-3 py-3.5">Target Strike</th>
                   <th className="px-3 py-3.5">Broker Payout</th>
                   <th className="px-3 py-3.5">Strategies Satisfied</th>
-                  <th className="px-3 py-3.5">Timestamp</th>
-                  <th className="px-4 py-3.5">Result</th>
-                  <th className="px-4 py-3.5 text-right">Action</th>
+                  <th className="px-3 py-3.5 text-right">Timestamp</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {isSignalsFetching && !hasLiveSignals ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <tr key={`signals-skeleton-${i}`}>
-                      <td className="px-6 py-3.5">
-                        <Skeleton className="h-4 w-24" />
-                      </td>
-                      <td className="px-3 py-3.5">
-                        <Skeleton className="h-4 w-16" />
-                      </td>
-                      <td className="px-3 py-3.5">
-                        <Skeleton className="h-4 w-12" />
-                      </td>
-                      <td className="px-3 py-3.5">
-                        <Skeleton className="h-4 w-28" />
-                      </td>
-                      <td className="px-3 py-3.5">
-                        <Skeleton className="h-4 w-16" />
-                      </td>
-                      <td className="px-3 py-3.5">
-                        <Skeleton className="h-4 w-16" />
-                      </td>
-                      <td className="px-3 py-3.5">
-                        <Skeleton className="h-4 w-12" />
-                      </td>
-                      <td className="px-3 py-3.5">
-                        <Skeleton className="h-4 w-20" />
-                      </td>
-                      <td className="px-3 py-3.5">
-                        <Skeleton className="h-4 w-16" />
-                      </td>
-                      <td className="px-3 py-3.5">
-                        <Skeleton className="h-4 w-16" />
-                      </td>
-                      <td className="px-4 py-3.5 text-right">
-                        <Skeleton className="h-6 w-14 ml-auto rounded" />
-                      </td>
+                      <td className="px-6 py-3.5"><Skeleton className="h-4 w-24" /></td>
+                      <td className="px-3 py-3.5"><Skeleton className="h-4 w-16" /></td>
+                      <td className="px-3 py-3.5"><Skeleton className="h-4 w-12" /></td>
+                      <td className="px-3 py-3.5"><Skeleton className="h-4 w-28" /></td>
+                      <td className="px-3 py-3.5"><Skeleton className="h-4 w-16" /></td>
+                      <td className="px-3 py-3.5"><Skeleton className="h-4 w-16" /></td>
+                      <td className="px-3 py-3.5"><Skeleton className="h-4 w-12" /></td>
+                      <td className="px-3 py-3.5"><Skeleton className="h-4 w-20" /></td>
+                      <td className="px-3 py-3.5 text-right"><Skeleton className="h-4 w-16 ml-auto" /></td>
                     </tr>
                   ))
                 ) : hasLiveSignals ? (
@@ -1820,9 +1527,7 @@ export default function LiveSignalsPage() {
                         onClick={() => setSelectedSignalId(sig.id || sigKey)}
                         className={cn(
                           "transition-colors cursor-pointer",
-                          isSelected
-                            ? "bg-primary/8 font-semibold"
-                            : "hover:bg-secondary/40",
+                          isSelected ? "bg-primary/10 font-semibold" : "hover:bg-surface-2/40",
                         )}
                       >
                         <td className="px-6 py-3.5">
@@ -1835,32 +1540,23 @@ export default function LiveSignalsPage() {
                               isSigUp
                                 ? "bg-up/10 text-up border-up/25"
                                 : isSigDown
-                                  ? "bg-down/10 text-down border-down/25"
-                                  : "bg-secondary text-muted-foreground border-border",
+                                ? "bg-down/10 text-down border-down/25"
+                                : "bg-surface-2 text-muted-foreground border-border",
                             )}
                           >
                             {isSigUp && <ArrowUpRight className="w-3 h-3" />}
-                            {isSigDown && (
-                              <ArrowDownRight className="w-3 h-3" />
-                            )}
+                            {isSigDown && <ArrowDownRight className="w-3 h-3" />}
                             {sig.direction}
                           </span>
                         </td>
                         <td className="px-3 py-3.5 font-mono">
-                          <span
-                            className={
-                              sig.confidence_score >= 75
-                                ? "text-emerald-400 font-bold"
-                                : "text-foreground"
-                            }
-                          >
+                          <span className={sig.confidence_score >= 75 ? "text-emerald-400 font-bold" : "text-foreground"}>
                             {sig.confidence_score}
                           </span>
-                          <span className="text-subtle">/100</span>
+                          <span className="text-muted-foreground/60">/100</span>
                         </td>
                         <td className="px-3 py-3.5 font-mono text-primary">
-                          {sig.consensus_count || 2} Satisfied •{" "}
-                          {sig.opposition_count || 0} Opposing
+                          {sig.consensus_count || 2} Satisfied • {sig.opposition_count || 0} Opposing
                         </td>
                         <td className="px-3 py-3.5 font-mono text-muted-foreground">
                           {sig.entry_baseline ?? sig.spot_price ?? "—"}
@@ -1875,27 +1571,21 @@ export default function LiveSignalsPage() {
                           <div className="flex flex-col gap-1">
                             {(() => {
                               const breakdown = sig.strategy_breakdown;
-                              const entries =
-                                breakdown && typeof breakdown === "object"
-                                  ? Object.entries(breakdown)
-                                  : [];
+                              const entries = breakdown && typeof breakdown === "object" ? Object.entries(breakdown) : [];
                               if (entries.length === 0) {
                                 return (
                                   <span className="text-[10px] font-mono text-muted-foreground">
-                                    {sig.consensus_count || 0}/3 · {sig.confidence_score}/100
+                                    {sig.consensus_count || 0}/4 · {sig.confidence_score}/100
                                   </span>
                                 );
                               }
                               return entries.map(([name, val], idx: number) => {
                                 const v = val as any;
-                                const voteDir =
-                                  (v && (v.direction || v.vote || v.signal)) || "WAIT";
+                                const voteDir = (v && (v.direction || v.vote || v.signal)) || "WAIT";
                                 const isUp = voteDir === "UP";
                                 const isDown = voteDir === "DOWN";
-                                const conf =
-                                  (v && (v.confidence_score || v.confidence || v.score)) || 0;
-                                const isSatisfied =
-                                  voteDir === sig.direction && conf > 0;
+                                const conf = (v && (v.confidence_score || v.confidence || v.score)) || 0;
+                                const isSatisfied = voteDir === sig.direction && conf > 0;
                                 return (
                                   <div
                                     key={name || idx}
@@ -1905,118 +1595,36 @@ export default function LiveSignalsPage() {
                                         ? isUp
                                           ? "text-up"
                                           : isDown
-                                            ? "text-down"
-                                            : "text-muted-foreground"
-                                        : "text-muted-foreground/50"
+                                          ? "text-down"
+                                          : "text-muted-foreground"
+                                        : "text-muted-foreground/50",
                                     )}
                                   >
-                                    {isSatisfied ? (
-                                      <CheckCircle2 className="w-3 h-3 shrink-0" />
-                                    ) : (
-                                      <XCircle className="w-3 h-3 shrink-0" />
-                                    )}
-                                    <span className="truncate max-w-[120px]">
-                                      {name}
-                                    </span>
-                                    <span className="text-subtle ml-auto">
-                                      {conf}%
-                                    </span>
+                                    {isSatisfied ? <CheckCircle2 className="w-3 h-3 shrink-0" /> : <XCircle className="w-3 h-3 shrink-0" />}
+                                    <span className="truncate max-w-[120px]">{name}</span>
+                                    <span className="text-muted-foreground/60 ml-auto">{conf}%</span>
                                   </div>
                                 );
                               });
                             })()}
                           </div>
                         </td>
-                        <td className="px-3 py-3.5 font-mono text-subtle">
+                        <td className="px-3 py-3.5 font-mono text-muted-foreground text-right">
                           {sig.created_at ? formatToUTC5(sig.created_at) : "—"}
-                        </td>
-                        {/* Result Column */}
-                        <td className="px-3 py-3.5">
-                          <span
-                            className={cn(
-                              "px-2 py-0.5 rounded-md text-[10px] font-mono font-bold border shrink-0",
-                              (() => {
-                                const s = sig as any;
-                                const outcome =
-                                  s.outcome ??
-                                  s.result ??
-                                  (s.is_win !== undefined
-                                    ? s.is_win
-                                      ? "Win"
-                                      : "Loss"
-                                    : undefined);
-                                if (
-                                  outcome === "Win" ||
-                                  outcome === "win" ||
-                                  outcome === "WON"
-                                )
-                                  return "bg-up/10 text-up border-up/20";
-                                if (
-                                  outcome === "Loss" ||
-                                  outcome === "loss" ||
-                                  outcome === "LOST"
-                                )
-                                  return "bg-down/10 text-down border-down/20";
-                                return "bg-secondary text-muted-foreground border-border";
-                              })()
-                            )}
-                          >
-                            {(() => {
-                               const s = sig as any;
-                              const outcome =
-                                s.outcome ??
-                                s.result ??
-                                (s.is_win !== undefined
-                                  ? s.is_win
-                                    ? "Win"
-                                    : "Loss"
-                                  : undefined);
-                              return (
-                                outcome === "Win" ||
-                                  outcome === "win" ||
-                                  outcome === "WON"
-                                  ? "Win"
-                                  : outcome === "Loss" ||
-                                    outcome === "loss" ||
-                                    outcome === "LOST"
-                                    ? "Loss"
-                                    : "Pending"
-                              );
-                            })()}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3.5 text-right">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedSignalId(sig.id);
-                            }}
-                            className={cn(
-                              "px-2.5 py-1 rounded-md text-[11px] font-mono border transition-all cursor-pointer",
-                              isSelected
-                                ? "bg-primary text-primary-foreground border-primary font-bold shadow-xs"
-                                : "bg-secondary text-muted-foreground border-border hover:text-foreground",
-                            )}
-                          >
-                            {isSelected ? "Active" : "Inspect"}
-                          </button>
                         </td>
                       </tr>
                     );
                   })
                 ) : (
                   <tr>
-                    <td colSpan={11} className="px-6 py-8 text-center">
+                    <td colSpan={9} className="px-6 py-8 text-center">
                       <div className="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto">
-                        <Radio className="w-8 h-8 text-emerald-400 animate-pulse" />
+                        <Radio className="w-8 h-8 text-primary animate-pulse" />
                         <p className="text-sm font-semibold text-foreground">
                           Quotex Telemetry Active — Listening for Setups
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          Browser extension is actively streaming chart ticks to
-                          the backend. Signals with confidence score &gt; 75
-                          will appear here automatically.
+                          Browser extension is actively streaming chart ticks to the backend. Signals with confidence score &gt; 75 will appear here automatically.
                         </p>
                       </div>
                     </td>

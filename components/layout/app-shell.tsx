@@ -53,7 +53,7 @@ const NAV_SECTIONS = [
         title: "Strategies",
         href: "/dashboard/strategies",
         icon: BarChart3,
-        badge: "6",
+        badge: "4",
       },
     ],
   },
@@ -247,83 +247,96 @@ export function AppShell({
       )}
 
       {/* ═════════════════════════════════════════════════════════════════════
-          SIDEBAR
+          SIDEBAR (MODERN TERMINAL DESIGN)
       ═════════════════════════════════════════════════════════════════════ */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-60 flex flex-col bg-card border-r border-border shrink-0 transition-transform duration-300",
+          "fixed inset-y-0 left-0 z-50 w-64 flex flex-col bg-card/95 backdrop-blur-md border-r border-border shrink-0 transition-transform duration-300",
           mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
         )}
       >
-        {/* Logo + brand */}
-        <div className="flex items-center gap-3 h-14 px-5 border-b border-border shrink-0 bg-surface-1">
+        {/* Logo + Brand Header */}
+        <div className="flex items-center justify-between h-16 px-4 border-b border-border/70 shrink-0 bg-surface-1/60">
           <Link
             href="/dashboard"
-            className="flex items-center gap-2 hover:opacity-90 transition-opacity"
+            className="flex items-center gap-3 group transition-transform active:scale-98"
           >
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0 shadow-[0_0_16px_rgba(59,130,246,0.4)]">
+            <div className="relative w-9 h-9 rounded-xl bg-gradient-to-br from-primary/20 via-surface-2 to-surface-3 p-1.5 border border-primary/30 shadow-[0_0_15px_rgba(240,185,11,0.15)] group-hover:border-primary/60 transition-colors">
               <Image
                 src={assets.logo}
                 alt="Apex Signal Trading Logo"
                 width={32}
                 height={32}
-                className="w-full h-full object-contain"
+                className="w-full h-full object-contain drop-shadow"
                 priority
               />
             </div>
-            <span className="font-display font-semibold tracking-tight text-foreground">
-              Apex<span className="text-primary">Signal</span>
-            </span>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="font-display font-black tracking-tight text-base text-foreground">
+                  Apex<span className="text-primary">Signal</span>
+                </span>
+              </div>
+              <span className="block text-[9px] font-mono tracking-widest text-muted-foreground uppercase font-semibold">
+                PRO TERMINAL v2.4
+              </span>
+            </div>
           </Link>
           <button
             onClick={() => setMobileOpen(false)}
-            className="lg:hidden text-muted-foreground hover:text-foreground p-1.5 rounded hover:bg-secondary transition-colors"
+            className="lg:hidden text-muted-foreground hover:text-foreground p-1.5 rounded-lg hover:bg-surface-2 transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Engine Status Strip */}
-        <div
-          className={cn(
-            "mx-4 mt-4 px-3 py-2.5 rounded-lg border flex items-center justify-between gap-3 transition-colors",
-            monitoringActive
-              ? "bg-up/10 border-up/20"
-              : "bg-secondary border-border",
-          )}
-        >
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <StatusDot
-              status={monitoringActive ? "online" : "offline"}
-            />
-            <span
-              className={cn(
-                "text-[11px] font-medium truncate",
-                monitoringActive ? "text-up" : "text-muted-foreground",
-              )}
-            >
-              Decision Engine
+        <div className="mx-3 mt-3 px-3 py-2 rounded-xl bg-surface-1/80 border border-border/80 flex items-center justify-between gap-2 shadow-xs">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="relative flex h-2 w-2 shrink-0">
+              <span
+                className={cn(
+                  "animate-ping absolute inline-flex h-full w-full rounded-full opacity-75",
+                  monitoringActive ? "bg-emerald-400" : "bg-primary/60",
+                )}
+              />
+              <span
+                className={cn(
+                  "relative inline-flex rounded-full h-2 w-2",
+                  monitoringActive ? "bg-emerald-400" : "bg-amber-400",
+                )}
+              />
             </span>
+            <div className="min-w-0">
+              <p className="text-[11px] font-mono font-bold text-foreground leading-tight truncate">
+                Decision Engine
+              </p>
+              <p className="text-[9px] font-mono text-muted-foreground leading-tight truncate">
+                {monitoringActive ? "Quotex Live M1" : "Standby Scanner"}
+              </p>
+            </div>
           </div>
           <span
             className={cn(
-              "text-[10px] font-mono font-semibold uppercase tracking-wider border rounded px-1.5 py-0.5",
+              "text-[9px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border shrink-0",
               monitoringActive
-                ? "bg-up/10 text-up border-up/20"
-                : "text-subtle border-border",
+                ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                : "bg-surface-2 text-muted-foreground border-border",
             )}
           >
-            {monitoringActive ? "ACTIVE" : "STANDBY"}
+            {monitoringActive ? "RUNNING" : "STANDBY"}
           </span>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-4">
+        <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-4">
           {NAV_SECTIONS.map((section) => (
             <div key={section.label}>
-              <p className="px-2 mb-2 text-[10px] font-semibold tracking-[0.18em] text-muted-foreground uppercase">
-                {section.label}
-              </p>
+              <div className="px-2 mb-1.5 flex items-center justify-between">
+                <span className="text-[10px] font-mono font-bold tracking-[0.16em] text-muted-foreground uppercase">
+                  {section.label}
+                </span>
+              </div>
               <ul className="space-y-1">
                 {section.items.map((item) => {
                   const Icon = item.icon;
@@ -334,28 +347,31 @@ export function AppShell({
                         href={item.href}
                         onClick={() => setMobileOpen(false)}
                         className={cn(
-                          "group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+                          "group relative flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-200",
                           isActive
-                            ? "bg-primary/10 text-primary border-r-2 border-primary"
-                            : "text-muted-foreground hover:text-foreground hover:bg-secondary",
+                            ? "bg-surface-2 text-foreground border border-border shadow-xs"
+                            : "text-muted-foreground hover:text-foreground hover:bg-surface-2/60",
                         )}
                       >
+                        {isActive && (
+                          <span className="absolute left-0 top-1.5 bottom-1.5 w-1 bg-primary rounded-r shadow-[0_0_8px_rgba(240,185,11,0.8)]" />
+                        )}
                         <Icon
                           className={cn(
-                            "w-4 h-4 shrink-0",
+                            "w-4 h-4 shrink-0 transition-colors",
                             isActive
                               ? "text-primary"
                               : "text-muted-foreground group-hover:text-foreground",
                           )}
                         />
-                        {item.title}
+                        <span className="truncate">{item.title}</span>
                         {item.badge && (
                           <span
                             className={cn(
-                              "ml-auto text-[9px] font-mono font-bold tracking-wider px-1.5 py-0.5 rounded",
+                              "ml-auto text-[9px] font-mono font-bold tracking-wider px-1.5 py-0.5 rounded-md border shrink-0",
                               item.badge === "LIVE"
-                                ? "bg-up/10 text-up border border-up/20"
-                                : "bg-secondary text-muted-foreground border border-border",
+                                ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30 animate-pulse"
+                                : "bg-surface-3 text-primary border-primary/20",
                             )}
                           >
                             {item.badge}
@@ -371,69 +387,76 @@ export function AppShell({
         </nav>
 
         {/* License Block */}
-        <div className="mx-4 mb-6 p-3.5 rounded-lg bg-secondary border border-border">
+        <div className="mx-3 mb-3 p-3 rounded-xl bg-surface-1/90 border border-border/80 shadow-xs relative overflow-hidden group">
           <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <ShieldCheck className="w-3.5 h-3.5 text-primary" />
-              <span className="text-xs font-semibold text-muted-foreground">
-                License
+              <span className="text-[11px] font-mono font-bold text-foreground">
+                {license.plan}
               </span>
             </div>
             <span
               className={cn(
-                "text-[10px] font-mono font-bold border rounded px-1.5 py-0.5",
+                "text-[9px] font-mono font-bold border rounded px-1.5 py-0.5",
                 license.isValid
-                  ? "text-up border-up/20 bg-up/10"
-                  : "text-down border-down/20 bg-down/10",
+                  ? "text-emerald-400 border-emerald-500/30 bg-emerald-500/10"
+                  : "text-rose-400 border-rose-500/30 bg-rose-500/10",
               )}
             >
               {license.isValid ? "ACTIVE" : "EXPIRED"}
             </span>
           </div>
-          <p className="text-sm font-semibold text-foreground">
-            {license.plan}
-          </p>
-          <div className="mt-2.5 w-full h-1.5 rounded-full bg-card overflow-hidden border border-border">
+
+          {/* Progress Meter */}
+          <div className="w-full h-1.5 rounded-full bg-surface-3 overflow-hidden border border-border/50">
             <div
-              className="h-full rounded-full bg-primary transition-all duration-300"
+              className="h-full rounded-full bg-gradient-to-r from-primary/80 to-primary transition-all duration-300"
               style={{
                 width: `${Math.max(5, Math.min(100, Math.round(((30 - license.daysRemaining) / 30) * 100)))}%`,
               }}
             />
           </div>
-          <p className="mt-1.5 text-[10px] text-muted-foreground font-medium">
-            {license.daysRemaining} days remaining
-          </p>
+
+          <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-muted-foreground">
+            <span>Expires in {license.daysRemaining}d</span>
+            <Link
+              href="/dashboard/license"
+              className="text-primary hover:underline font-semibold"
+            >
+              Manage →
+            </Link>
+          </div>
         </div>
 
-        {/* User & Theme */}
-        <div className="p-4 border-t border-border flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2.5 overflow-hidden">
-            <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-xs font-bold text-primary shrink-0">
+        {/* User Profile & Theme */}
+        <div className="p-3 border-t border-border/70 flex items-center justify-between shrink-0 bg-surface-1/40">
+          <div className="flex items-center gap-2.5 overflow-hidden min-w-0">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-surface-2 border border-primary/40 flex items-center justify-center text-xs font-bold font-mono text-primary shrink-0 shadow-xs">
               {userProfile?.full_name
                 ? userProfile.full_name[0].toUpperCase()
                 : "A"}
             </div>
-            <div className="overflow-hidden">
-              <p className="text-xs font-semibold text-foreground truncate">
+            <div className="overflow-hidden min-w-0">
+              <p className="text-xs font-semibold text-foreground truncate leading-tight">
                 {userProfile?.full_name ||
                   (userProfile?.email
                     ? userProfile.email.split("@")[0]
                     : "Operator")}
               </p>
-              <p className="text-[10px] text-muted-foreground truncate">
-                {userProfile?.email || "Terminal Member"}
+              <p className="text-[10px] font-mono text-muted-foreground truncate leading-tight flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0 inline-block" />
+                Verified
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center gap-1 shrink-0">
             <ThemeToggle variant="icon" />
             <button
               onClick={handleLogout}
-              className="p-1.5 rounded-lg text-subtle hover:text-down hover:bg-down/5 transition-colors cursor-pointer"
+              className="p-1.5 rounded-lg text-muted-foreground hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
               title="Sign out & disconnect session"
             >
-              <LogOut className="w-3.5 h-3.5" />
+              <LogOut className="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -442,7 +465,7 @@ export function AppShell({
       {/* ═══════════════════════════════════════════════════════════════════════
           MAIN CONTENT
       ══════════════════════════════════════════════════════════════════════ */}
-      <div className="flex-1 flex flex-col lg:ml-60 min-w-0 max-w-full">
+      <div className="flex-1 flex flex-col lg:ml-64 min-w-0 max-w-full">
         {/* Top Header */}
         <header className="sticky top-0 z-30 h-14 flex items-center justify-between px-4 md:px-6 bg-background/60 backdrop-blur border-b border-border">
           <div className="flex items-center gap-3">

@@ -57,43 +57,43 @@
 [data-theme="light"],
 html.light,
 .light {
-  /* Clean Light Theme */
-  --background: #f7f9fc;
-  --foreground: #0f172a;
+  /* TradingView / Clean Pro Light Theme */
+  --background: #f8fafc;
+  --foreground: #181a20;
   --card: #ffffff;
-  --card-foreground: #0f172a;
+  --card-foreground: #181a20;
   --popover: #ffffff;
-  --popover-foreground: #0f172a;
+  --popover-foreground: #181a20;
 
-  --primary: #1d4ed8;
-  --primary-hover: #1e40af;
-  --primary-foreground: #ffffff;
+  --primary: #f0b90b;
+  --primary-hover: #dfa800;
+  --primary-foreground: #000000;
 
-  --secondary: #f1f5f9;
-  --secondary-foreground: #0f172a;
+  --secondary: #f0f3f6;
+  --secondary-foreground: #181a20;
 
-  --muted: #f1f5f9;
-  --muted-foreground: #64748b;
-  --subtle: #94a3b8;
+  --muted: #f0f3f6;
+  --muted-foreground: #707a8a;
+  --subtle: #929aa5;
 
-  --border: #e2e8f0;
-  --border-subtle: #f8fafc;
+  --border: #eaecef;
+  --border-subtle: #f4f5f7;
 
-  --accent: #eff6ff;
-  --accent-foreground: #1e40af;
+  --accent: #fef8e7;
+  --accent-foreground: #b78a00;
 
-  --destructive: #dc2626;
-  --input: #e2e8f0;
-  --ring: rgba(29, 78, 216, 0.35);
+  --destructive: #f6465d;
+  --input: #eaecef;
+  --ring: rgba(240, 185, 11, 0.4);
 
   --surface-0: #ffffff;
   --surface-1: #f8fafc;
-  --surface-2: #f1f5f9;
-  --surface-3: #e2e8f0;
+  --surface-2: #f0f3f6;
+  --surface-3: #eaecef;
 
-  --up: #059669;
-  --down: #dc2626;
-  --warning: #d97706;
+  --up: #0ecb81;
+  --down: #f6465d;
+  --warning: #f0b90b;
 
   --radius-sm: 0.5rem;
   --radius: 0.75rem;
@@ -104,43 +104,43 @@ html.light,
 .dark,
 [data-theme="dark"],
 html.dark {
-  /* Professional Dark Financial Terminal Theme */
-  --background: #070b14;
-  --foreground: #f1f5f9;
-  --card: #0e1624;
-  --card-foreground: #f1f5f9;
-  --popover: #0f172a;
-  --popover-foreground: #f1f5f9;
+  /* Binance & TradingView Dark Theme — Deep Graphite & Neon Signal Matrix */
+  --background: #0b0e11;
+  --foreground: #eaecef;
+  --card: #181a20;
+  --card-foreground: #eaecef;
+  --popover: #181a20;
+  --popover-foreground: #eaecef;
 
-  --primary: #3b82f6;
-  --primary-hover: #2563eb;
-  --primary-foreground: #ffffff;
+  --primary: #f0b90b;
+  --primary-hover: #fcd535;
+  --primary-foreground: #000000;
 
-  --secondary: #111827;
-  --secondary-foreground: #f1f5f9;
+  --secondary: #20252e;
+  --secondary-foreground: #eaecef;
 
-  --muted: #111827;
-  --muted-foreground: #71717a;
-  --subtle: #3f3f46;
+  --muted: #20252e;
+  --muted-foreground: #848e9c;
+  --subtle: #474d57;
 
-  --border: #1e293b;
-  --border-subtle: #1e293b;
+  --border: #262c36;
+  --border-subtle: #1e2329;
 
-  --accent: #1e293b;
-  --accent-foreground: #f1f5f9;
+  --accent: #2b2716;
+  --accent-foreground: #f0b90b;
 
-  --destructive: #f87171;
-  --input: #1e293b;
-  --ring: rgba(59, 130, 246, 0.4);
+  --destructive: #f6465d;
+  --input: #262c36;
+  --ring: rgba(240, 185, 11, 0.45);
 
-  --surface-0: #070b14;
-  --surface-1: #0e1624;
-  --surface-2: #111827;
-  --surface-3: #1e293b;
+  --surface-0: #0b0e11;
+  --surface-1: #181a20;
+  --surface-2: #20252e;
+  --surface-3: #2b313a;
 
-  --up: #10b981;
-  --down: #ef4444;
-  --warning: #f59e0b;
+  --up: #0ecb81;
+  --down: #f6465d;
+  --warning: #f0b90b;
 
   --radius-sm: 0.5rem;
   --radius: 0.75rem;
@@ -166,7 +166,7 @@ body {
 }
 
 ::selection {
-  background: rgba(59, 130, 246, 0.3);
+  background: rgba(240, 185, 11, 0.35);
   color: #fff;
 }
 
@@ -203,17 +203,21 @@ body {
 }
 
 /* Utilities */
-.glow-blue {
-  box-shadow: 0 0 24px rgba(59, 130, 246, 0.15);
+.glow-primary {
+  box-shadow: 0 0 24px rgba(240, 185, 11, 0.3);
 }
 .glow-up {
-  box-shadow: 0 0 24px rgba(16, 185, 129, 0.15);
+  box-shadow: 0 0 24px rgba(14, 203, 129, 0.25);
 }
 .glow-down {
-  box-shadow: 0 0 24px rgba(239, 68, 68, 0.15);
+  box-shadow: 0 0 24px rgba(246, 70, 93, 0.25);
 }
 .glow-warning {
-  box-shadow: 0 0 24px rgba(245, 158, 11, 0.15);
+  box-shadow: 0 0 24px rgba(240, 185, 11, 0.25);
+}
+/* Legacy compat */
+.glow-blue {
+  box-shadow: 0 0 24px rgba(240, 185, 11, 0.3);
 }
 
 .accent-top {
@@ -231,10 +235,10 @@ body {
 
 @keyframes pulseGlow {
   0%, 100% {
-    box-shadow: 0 0 20px rgba(59, 130, 246, 0.15);
+    box-shadow: 0 0 20px rgba(240, 185, 11, 0.25);
   }
   50% {
-    box-shadow: 0 0 40px rgba(59, 130, 246, 0.35);
+    box-shadow: 0 0 40px rgba(240, 185, 11, 0.45);
   }
 }
 
@@ -255,8 +259,8 @@ body {
 
 /* Glass card */
 .glass-card {
-  background: rgba(14, 22, 36, 0.6);
-  backdrop-filter: blur(12px);
+  background: rgba(24, 26, 32, 0.75);
+  backdrop-filter: blur(16px);
   border: 1px solid var(--border);
 }
 

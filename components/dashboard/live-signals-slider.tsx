@@ -377,7 +377,7 @@ export function LiveSignalsSlider({
                   className={cn(
                     "snap-start shrink-0 min-w-[230px] max-w-[270px] p-3 rounded-xl border text-left cursor-pointer select-none transition-all duration-150 flex flex-col justify-between gap-2.5",
                     isSelected
-                      ? "bg-card border-primary shadow-[0_0_18px_rgba(79,142,247,0.22)] ring-1.5 ring-primary"
+                      ? "bg-card border-primary shadow-[0_0_18px_rgba(240,185,11,0.28)] ring-1.5 ring-primary"
                       : "bg-secondary/40 border-border hover:border-primary/40 hover:bg-secondary/70"
                   )}
                 >
