@@ -2,7 +2,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   getRecentSignalsApi,
   getAttributionStatsApi,
-  getAttributedOrdersApi,
   backfillAttributionApi,
   getSignalByIdApi,
 } from "@/lib/API/signals";
@@ -38,26 +37,6 @@ export const useAttributionStats = (options = {}) => {
   return useQuery({
     queryKey: ["signals", "attribution", "stats"],
     queryFn: () => getAttributionStatsApi(),
-    refetchInterval: options.refetchInterval ?? false,
-    staleTime: options.staleTime ?? Infinity,
-    refetchOnWindowFocus: options.refetchOnWindowFocus ?? false,
-    ...options,
-  });
-};
-
-/**
- * Hook: Retrieve Attributed Trade Orders
- *
- * @param {{ asset?: string | null, limit?: number }} [params]
- * @param {object} [options]
- */
-export const useAttributedOrders = (
-  { asset = null, limit = 50 } = {},
-  options = {}
-) => {
-  return useQuery({
-    queryKey: ["signals", "attribution", "orders", asset, limit],
-    queryFn: () => getAttributedOrdersApi({ asset, limit }),
     refetchInterval: options.refetchInterval ?? false,
     staleTime: options.staleTime ?? Infinity,
     refetchOnWindowFocus: options.refetchOnWindowFocus ?? false,

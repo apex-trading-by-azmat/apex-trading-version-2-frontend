@@ -490,16 +490,7 @@ export function AppShell({
               </span>
             </div>
 
-            <div className="hidden lg:flex items-center px-2.5 py-1.5 rounded-lg bg-primary/8 border border-primary/20 text-xs font-mono font-semibold text-primary">
-              60s Fixed Expiry
-            </div>
-
             <ThemeToggle variant="pill" />
-
-            <button className="relative p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary border border-transparent hover:border-border transition-all">
-              <Bell className="w-4 h-4" />
-              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-primary" />
-            </button>
           </div>
         </header>
 

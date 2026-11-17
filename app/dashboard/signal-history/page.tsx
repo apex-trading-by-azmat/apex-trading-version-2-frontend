@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { cn, formatToUTC5 } from "@/lib/utils";
 import { CurrencyPairDisplay } from "@/components/ui/currency-pair";
-import { useRecentSignals, useAttributedOrders, useBackfillAttribution } from "@/hook/useSignals";
+import { useRecentSignals, useBackfillAttribution } from "@/hook/useSignals";
 import { Skeleton } from "@/components/ui/skeleton";
 
 function DirBadge({ dir }: { dir: string }) {
@@ -44,7 +44,6 @@ export default function SignalHistoryPage() {
   const [backfillMessage, setBackfillMessage] = useState<string | null>(null);
 
   const { data: recentSignals, isLoading: signalsLoading } = useRecentSignals({ limit: 100 });
-  const { data: attributedOrders, isLoading: ordersLoading } = useAttributedOrders({ limit: 100 });
   const backfillMutation = useBackfillAttribution({
     onSuccess: (data: any) => {
       setBackfillMessage(

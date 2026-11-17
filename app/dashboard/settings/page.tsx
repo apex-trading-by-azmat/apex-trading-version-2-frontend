@@ -1,10 +1,27 @@
+"use client";
 import { AppShell } from "@/components/layout/app-shell";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { settingsSections } from "@/lib/mock-data";
-import { Settings, Shield, Bell, Globe, Sliders, Check } from "lucide-react";
+import { Volume2, VolumeX } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useState, useEffect } from "react";
 
 export default function SettingsPage() {
+  const [soundEnabled, setSoundEnabled] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return localStorage.getItem("apex_sound_enabled") !== "false";
+  });
+
+  useEffect(() => {
+    localStorage.setItem("apex_sound_enabled", String(soundEnabled));
+    window.dispatchEvent(new Event("apex_sound_toggled"));
+  }, [soundEnabled]);
+
+  const toggleSound = () => {
+    const nextState = !soundEnabled;
+    setSoundEnabled(nextState);
+  };
+
   return (
     <AppShell
       title="Settings"
@@ -44,6 +61,42 @@ export default function SettingsPage() {
             </Card>
           ))}
         </div>
+
+        {/* Sound Alerts Card */}
+        <Card className="border-border bg-card shadow-sm hover:border-primary/40 transition-colors">
+          <CardHeader className="pb-3 border-b border-border">
+            <CardTitle className="text-sm font-semibold tracking-tight text-foreground">
+              Sound Alerts
+            </CardTitle>
+            <CardDescription className="text-xs text-muted-foreground">
+              Configure audio notifications for signal events
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between rounded-lg border border-border bg-secondary px-3 py-2.5 text-xs">
+              <div className="flex items-center gap-2">
+                {soundEnabled ? (
+                  <Volume2 className="w-4 h-4 text-up" />
+                ) : (
+                  <VolumeX className="w-4 h-4 text-muted-foreground" />
+                )}
+                <span className="text-foreground">Audio Alerts</span>
+              </div>
+              <button
+                type="button"
+                onClick={toggleSound}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-xs font-mono font-semibold border flex items-center gap-1.5 transition-all cursor-pointer",
+                  soundEnabled
+                    ? "bg-up/15 text-up border-up/30 shadow-[0_0_12px_rgba(0,200,150,0.15)]"
+                    : "bg-secondary text-muted-foreground border-border hover:text-foreground",
+                )}
+              >
+                {soundEnabled ? "ON" : "MUTED"}
+              </button>
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="flex justify-end pt-2">
           <button className="px-4 py-2 rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-semibold transition-colors shadow-sm shadow-primary/20">
