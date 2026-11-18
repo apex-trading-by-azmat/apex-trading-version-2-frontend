@@ -26,6 +26,9 @@ import { useQueryClient } from "@tanstack/react-query";
  *   connect: Function
  * }}
  */
+const normalizeKey = (sym) =>
+  sym ? String(sym).toUpperCase().replace(/[\/\s\(\)\-_]/g, "").replace(/OTC$/, "") : "";
+
 export function useSignalsWebSocket() {
   const queryClient = useQueryClient();
   const [sessionId, setSessionId] = useState(null);
@@ -41,6 +44,17 @@ export function useSignalsWebSocket() {
   const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
   const connectRef = useRef(null);
+
+  const updateConnectionStatus = useCallback((status) => {
+    setIsConnected(status);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("apex_ws_status_change", {
+          detail: { isConnected: status },
+        })
+      );
+    }
+  }, []);
 
   const getToken = useCallback(() => {
     if (typeof window === "undefined") return null;
@@ -68,7 +82,7 @@ export function useSignalsWebSocket() {
   const connect = useCallback(() => {
     const url = buildWsUrl();
     if (!url) {
-      setIsConnected(false);
+      updateConnectionStatus(false);
       return;
     }
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
@@ -78,7 +92,7 @@ export function useSignalsWebSocket() {
       wsRef.current = socket;
 
       socket.onopen = () => {
-        setIsConnected(true);
+        updateConnectionStatus(true);
         setLastEvent("connected");
         if (reconnectTimeoutRef.current) {
           clearTimeout(reconnectTimeoutRef.current);
@@ -91,6 +105,15 @@ export function useSignalsWebSocket() {
           const msg = JSON.parse(event.data);
           if (!msg || typeof msg !== "object") return;
 
+          // Dispatch real-time backend data arrival
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(
+              new CustomEvent("apex_ws_data_received", {
+                detail: { event: msg.event || msg.type, timestamp: Date.now() },
+              })
+            );
+          }
+
           if (msg.event === "connected") {
             const sid = msg.session_id || null;
             if (sid) {
@@ -99,7 +122,7 @@ export function useSignalsWebSocket() {
                 localStorage.setItem("apex_session_id", sid);
               }
             }
-            setIsConnected(true);
+            updateConnectionStatus(true);
             setLastEvent("connected");
             return;
           }
@@ -114,19 +137,42 @@ export function useSignalsWebSocket() {
               if (data.broker_payout !== undefined) {
                 setActiveChartPayout(data.broker_payout);
               }
-              setActiveSignal((prev) => ({
-                id: `standby-${activeAsset}`,
-                asset: activeAsset,
-                broker_payout: data.broker_payout ?? prev?.broker_payout ?? 0,
-                direction: "WAIT",
-                status_code: "WAITING_FOR_SETUP",
-                is_qualified: false,
-                confidence_score: 0,
-                consensus_count: 0,
-                opposition_count: 0,
-                event: "chart/active_asset",
-                received_at: new Date().toISOString(),
-              }));
+              setActiveSignal((prev) => {
+                // If prev is an active qualified UP/DOWN signal within its 60s lifecycle (with 5s buffer), keep it!
+                if (
+                  prev &&
+                  prev.is_qualified &&
+                  (prev.direction === "UP" || prev.direction === "DOWN")
+                ) {
+                  const createdAt = prev.created_at || prev.timestamp || prev.received_at;
+                  if (createdAt) {
+                    const ageMs = Date.now() - new Date(createdAt).getTime();
+                    if (
+                      ageMs >= 0 &&
+                      ageMs < 65000 &&
+                      (!prev.asset || normalizeKey(prev.asset) === normalizeKey(activeAsset))
+                    ) {
+                      return {
+                        ...prev,
+                        broker_payout: data.broker_payout ?? prev.broker_payout,
+                      };
+                    }
+                  }
+                }
+                return {
+                  id: `standby-${activeAsset}`,
+                  asset: activeAsset,
+                  broker_payout: data.broker_payout ?? prev?.broker_payout ?? 0,
+                  direction: "WAIT",
+                  status_code: "WAITING_FOR_SETUP",
+                  is_qualified: false,
+                  confidence_score: 0,
+                  consensus_count: 0,
+                  opposition_count: 0,
+                  event: "chart/active_asset",
+                  received_at: new Date().toISOString(),
+                };
+              });
             }
             return;
           }
@@ -140,42 +186,68 @@ export function useSignalsWebSocket() {
             const data = msg.data || msg.payload || {};
             const eventName = msg.event || msg.type;
             setLastEvent(eventName);
-            const chartAsset = data.active_chart_asset || data.asset || null;
-            if (chartAsset) {
-              setActiveChartAsset(chartAsset);
+
+            // Strictly update activeChartAsset ONLY if backend explicitly marks this as the active chart
+            if (data.is_active_chart && (data.active_chart_asset || data.asset)) {
+              setActiveChartAsset(data.active_chart_asset || data.asset);
             }
             const signalId = data.id || `sig-${data.asset || "unknown"}-${data.timestamp || Date.now()}`;
             const signalObj = {
               ...data,
               id: signalId,
+              created_at: data.created_at || data.timestamp || new Date().toISOString(),
               direction: data.direction || "WAIT",
               event: eventName,
               received_at: new Date().toISOString(),
             };
-            setActiveSignal(signalObj);
 
-            // Update TanStack query cache for recent signals in-memory
-            try {
-              queryClient.setQueriesData(
-                { queryKey: ["signals", "recent"] },
-                (old) => {
-                  if (!old) return [signalObj];
-                  const list = Array.isArray(old) ? [...old] : [old];
-                  const idx = list.findIndex(
-                    (s) =>
-                      (s.id && signalObj.id && s.id === signalObj.id) ||
-                      (s.asset === signalObj.asset && s.created_at === signalObj.created_at)
-                  );
-                  if (idx >= 0) {
-                    list[idx] = { ...list[idx], ...signalObj };
-                  } else {
-                    list.unshift(signalObj);
+            setActiveSignal((prev) => {
+              // If incoming signal is WAIT (or unqualified), do NOT clobber an active qualified UP/DOWN signal within its 60s lifecycle!
+              if (!signalObj.is_qualified || signalObj.direction === "WAIT") {
+                if (
+                  prev &&
+                  prev.is_qualified &&
+                  (prev.direction === "UP" || prev.direction === "DOWN")
+                ) {
+                  const createdAt = prev.created_at || prev.timestamp || prev.received_at;
+                  if (createdAt) {
+                    const ageMs = Date.now() - new Date(createdAt).getTime();
+                    if (ageMs >= 0 && ageMs < 65000) {
+                      return prev;
+                    }
                   }
-                  return list.slice(0, 50);
                 }
-              );
-            } catch {
-              // Ignore cache update errors
+              }
+              return signalObj;
+            });
+
+            // Only update TanStack query cache for qualified trade signals (UP/DOWN) — NEVER add WAIT states!
+            if (
+              signalObj.is_qualified &&
+              (signalObj.direction === "UP" || signalObj.direction === "DOWN")
+            ) {
+              try {
+                queryClient.setQueriesData(
+                  { queryKey: ["signals", "recent"] },
+                  (old) => {
+                    if (!old) return [signalObj];
+                    const list = Array.isArray(old) ? [...old] : [old];
+                    const idx = list.findIndex(
+                      (s) =>
+                        (s.id && signalObj.id && s.id === signalObj.id) ||
+                        (s.asset === signalObj.asset && s.created_at === signalObj.created_at)
+                    );
+                    if (idx >= 0) {
+                      list[idx] = { ...list[idx], ...signalObj };
+                    } else {
+                      list.unshift(signalObj);
+                    }
+                    return list.slice(0, 50);
+                  }
+                );
+              } catch {
+                // Ignore cache update errors
+              }
             }
             return;
           }
@@ -227,18 +299,18 @@ export function useSignalsWebSocket() {
 
       socket.onclose = () => {
         wsRef.current = null;
-        setIsConnected(false);
+        updateConnectionStatus(false);
         reconnectTimeoutRef.current = setTimeout(() => {
           connectRef.current?.();
         }, 3000);
       };
 
       socket.onerror = () => {
-        setIsConnected(false);
+        updateConnectionStatus(false);
         socket.close();
       };
     } catch {
-      setIsConnected(false);
+      updateConnectionStatus(false);
       reconnectTimeoutRef.current = setTimeout(() => {
         connectRef.current?.();
       }, 3000);
@@ -253,6 +325,7 @@ export function useSignalsWebSocket() {
     setTotalWatchlistAssets,
     setLastEvent,
     setIsConnected,
+    updateConnectionStatus,
   ]);
 
   // Keep connectRef in sync with the latest connect callback so reconnection

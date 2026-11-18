@@ -10,6 +10,8 @@ import {
   Download,
   RotateCw,
   CheckCircle2,
+  XCircle,
+  MinusCircle,
 } from "lucide-react";
 import { cn, formatToUTC5 } from "@/lib/utils";
 import { CurrencyPairDisplay } from "@/components/ui/currency-pair";
@@ -39,8 +41,82 @@ function DirBadge({ dir }: { dir: string }) {
   );
 }
 
+function TradeOutcomeBadge({
+  outcome,
+  profit,
+  isQualified,
+}: {
+  outcome?: string | null;
+  profit?: number | null;
+  isQualified?: boolean;
+}) {
+  const normalized = outcome?.toUpperCase();
+
+  if (normalized === "WIN") {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-[11px] font-bold font-mono px-2.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 shadow-xs">
+        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+        <span>WIN</span>
+        {profit !== undefined && profit !== null && (
+          <span className="text-[10px] text-emerald-400/80 font-normal ml-0.5">
+            (+${Math.abs(profit).toFixed(2)})
+          </span>
+        )}
+      </span>
+    );
+  }
+
+  if (normalized === "LOSS") {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-[11px] font-bold font-mono px-2.5 py-0.5 rounded-md bg-rose-500/10 text-rose-400 border border-rose-500/25 shadow-xs">
+        <XCircle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+        <span>LOSS</span>
+        {profit !== undefined && profit !== null && (
+          <span className="text-[10px] text-rose-400/80 font-normal ml-0.5">
+            (-${Math.abs(profit).toFixed(2)})
+          </span>
+        )}
+      </span>
+    );
+  }
+
+  if (normalized === "DRAW") {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-[11px] font-bold font-mono px-2.5 py-0.5 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/25 shadow-xs">
+        <MinusCircle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+        <span>DRAW</span>
+        <span className="text-[10px] text-amber-400/80 font-normal ml-0.5">($0.00)</span>
+      </span>
+    );
+  }
+
+  if (normalized === "OPEN") {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-[11px] font-bold font-mono px-2.5 py-0.5 rounded-md bg-blue-500/10 text-blue-400 border border-blue-500/25 animate-pulse shadow-xs">
+        <Clock className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+        <span>IN PLAY</span>
+      </span>
+    );
+  }
+
+  // Not traded by user
+  if (isQualified) {
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] font-semibold font-mono px-2 py-0.5 rounded-md bg-secondary text-muted-foreground border border-border">
+        UNTRADED
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1 text-[10px] font-semibold font-mono px-2 py-0.5 rounded-md bg-secondary text-muted-foreground border border-border">
+      WAIT
+    </span>
+  );
+}
+
 export default function SignalHistoryPage() {
-  const [selectedFilter, setSelectedFilter] = useState("All Markets");
+  const [selectedFilter, setSelectedFilter] = useState("All Signals");
   const [backfillMessage, setBackfillMessage] = useState<string | null>(null);
 
   const { data: recentSignals, isLoading: signalsLoading } = useRecentSignals({ limit: 100 });
@@ -90,12 +166,16 @@ export default function SignalHistoryPage() {
   const filteredList = rawList.filter((item: any) => {
     const pair = item.asset || "";
     const isOtc = pair.toUpperCase().includes("OTC") || item.market === "OTC" || pair.includes("_otc");
-    const outcome = item.outcome || (item.is_qualified ? "Win" : "WAIT");
+    const outcome = item.outcome ? String(item.outcome).toUpperCase() : null;
+    const isTraded = item.traded === true || Boolean(outcome);
 
     if (selectedFilter === "OTC Only") return isOtc;
     if (selectedFilter === "Regular Market") return !isOtc;
-    if (selectedFilter === "Wins") return outcome.toLowerCase() === "win";
-    if (selectedFilter === "Losses") return outcome.toLowerCase() === "loss";
+    if (selectedFilter === "Wins") return outcome === "WIN";
+    if (selectedFilter === "Losses") return outcome === "LOSS";
+    if (selectedFilter === "Draws") return outcome === "DRAW";
+    if (selectedFilter === "Traded") return isTraded;
+    if (selectedFilter === "Untraded") return !isTraded;
     if (selectedFilter === "WAIT Skips") return item.direction === "WAIT";
     return true;
   });
@@ -121,7 +201,16 @@ export default function SignalHistoryPage() {
               <Filter className="w-3 h-3 text-primary" />
               Filter:
             </span>
-            {["All Markets", "OTC Only", "Regular Market", "Wins", "Losses", "WAIT Skips"].map((f) => (
+            {[
+              "All Signals",
+              "Wins",
+              "Losses",
+              "Draws",
+              "Traded",
+              "Untraded",
+              "OTC Only",
+              "Regular Market",
+            ].map((f) => (
               <button
                 key={f}
                 onClick={() => setSelectedFilter(f)}
@@ -180,7 +269,7 @@ export default function SignalHistoryPage() {
                   <th className="px-3 py-4">Score</th>
                   <th className="px-3 py-4">Entry Baseline</th>
                   <th className="px-3 py-4">Target Strike</th>
-                  <th className="px-3 py-4 text-right">Status</th>
+                  <th className="px-5 py-4 text-right">Trade Outcome</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -195,7 +284,7 @@ export default function SignalHistoryPage() {
                       <td className="px-3 py-4"><Skeleton className="h-4 w-12" /></td>
                       <td className="px-3 py-4"><Skeleton className="h-4 w-16" /></td>
                       <td className="px-3 py-4"><Skeleton className="h-4 w-16" /></td>
-                      <td className="px-3 py-4 text-right"><Skeleton className="h-5 w-16 ml-auto rounded" /></td>
+                      <td className="px-5 py-4 text-right"><Skeleton className="h-5 w-20 ml-auto rounded" /></td>
                     </tr>
                   ))
                 ) : filteredList.length > 0 ? (
@@ -212,8 +301,6 @@ export default function SignalHistoryPage() {
                     const score = row.confidence_score ?? parseInt(row.score || "0");
                     const entry = row.entry_baseline ?? row.spot_price ?? row.entry ?? "—";
                     const target = row.target_strike ?? row.exit ?? "—";
-                    const outcome =
-                      row.outcome || (row.is_qualified ? "QUALIFIED" : "WAIT");
 
                     return (
                       <tr
@@ -262,19 +349,12 @@ export default function SignalHistoryPage() {
                         <td className="px-3 py-4 font-mono text-muted-foreground">
                           {typeof target === "number" ? target.toFixed(4) : target}
                         </td>
-                        <td className="px-3 py-4 text-right">
-                          <span
-                            className={cn(
-                              "text-[11px] font-bold font-mono px-2 py-0.5 rounded border",
-                              outcome.toLowerCase() === "win" || outcome === "QUALIFIED"
-                                ? "bg-up/10 text-up border-up/20"
-                                : outcome.toLowerCase() === "loss"
-                                  ? "bg-down/10 text-down border-down/20"
-                                  : "bg-secondary text-muted-foreground border-border"
-                            )}
-                          >
-                            {outcome}
-                          </span>
+                        <td className="px-5 py-4 text-right">
+                          <TradeOutcomeBadge
+                            outcome={row.outcome}
+                            profit={row.profit}
+                            isQualified={row.is_qualified}
+                          />
                         </td>
                       </tr>
                     );

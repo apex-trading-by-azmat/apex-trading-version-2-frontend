@@ -214,6 +214,18 @@ export default function RegisterWizardPage() {
   // Load saved state from localStorage if available
   useEffect(() => {
     try {
+      if (typeof window !== "undefined") {
+        const urlParams = new URLSearchParams(window.location.search);
+        const queryStep = urlParams.get("step");
+        if (queryStep === "1" || queryStep === "2" || queryStep === "3") {
+          setCurrentStep(parseInt(queryStep, 10) as 1 | 2 | 3);
+        }
+        const queryEmail = urlParams.get("email");
+        if (queryEmail) {
+          setFormData((prev) => ({ ...prev, email: queryEmail }));
+        }
+      }
+
       const savedStep = localStorage.getItem("apex_reg_step");
       if (savedStep) {
         const stepNum = parseInt(savedStep, 10);
@@ -382,7 +394,7 @@ export default function RegisterWizardPage() {
     });
   };
 
-  // Step 3: Refresh payment status
+  // Step 3: Refresh payment status (Strictly on-demand upon clicking the button, NO auto-polling)
   const handleRefreshStatus = async () => {
     setIsRefreshingStatus(true);
     setRefreshNotice(null);
@@ -415,31 +427,67 @@ export default function RegisterWizardPage() {
         }
       }
 
-      // 2. Query backend using loginApi with saved credentials
-      const email = formData.email?.trim();
-      const password = formData.password;
+      // 2. Query backend payment status endpoint (GET /auth/payment-status)
+      const email =
+        formData.email?.trim() ||
+        (() => {
+          try {
+            const u = localStorage.getItem("apex_reg_user");
+            return u ? JSON.parse(u)?.email : "";
+          } catch {
+            return "";
+          }
+        })();
+      const transactionId =
+        paymentData.transactionId?.trim() ||
+        (() => {
+          try {
+            const p = localStorage.getItem("apex_reg_payment");
+            return p ? JSON.parse(p)?.transactionId : "";
+          } catch {
+            return "";
+          }
+        })();
 
-      if (email && password) {
+      if (email || transactionId) {
         try {
-          const res = await authApi.login({ email, password });
-          const userStatus = res?.user?.status || "";
-          if (res?.access_token || isStatusApproved(userStatus)) {
-            // Admin approved on the backend!
-            localStorage.setItem("apex_token", res.access_token);
-            if (res.refresh_token) {
-              localStorage.setItem("apex_refresh_token", res.refresh_token);
-            }
-            if (res.user) {
-              localStorage.setItem("apex_user", JSON.stringify(res.user));
-            }
+          const res = await authApi.getPaymentStatus({
+            email: email || undefined,
+            transaction_id: transactionId || undefined,
+          });
 
-            // Update local payment state
+          const userStatus = (res?.user_status || "").toUpperCase();
+          const paymentStatus = (res?.payment_status || "").toUpperCase();
+
+          if (isStatusApproved(userStatus) || paymentStatus === "APPROVED") {
             setSubmissionStatus("approved");
             setAccountComplete(true);
             setRefreshNotice({
               type: "success",
-              text: "Payment verified successfully by administrator! Account is active.",
+              text: "Payment verified successfully by administrator! Your account is active.",
             });
+
+            // If user has saved credentials, also attempt to sign in to obtain JWT tokens
+            const password = formData.password || (typeof window !== "undefined" ? sessionStorage.getItem("apex_reg_pwd") : null);
+            if (email && password) {
+              try {
+                const loginRes = await authApi.login({ email, password });
+                if (loginRes?.access_token) {
+                  localStorage.setItem("apex_token", loginRes.access_token);
+                  localStorage.setItem("access_token", loginRes.access_token);
+                  if (loginRes.refresh_token) {
+                    localStorage.setItem("apex_refresh_token", loginRes.refresh_token);
+                    localStorage.setItem("refresh_token", loginRes.refresh_token);
+                  }
+                  if (loginRes.user) {
+                    localStorage.setItem("apex_user", JSON.stringify(loginRes.user));
+                    localStorage.setItem("user", JSON.stringify(loginRes.user));
+                  }
+                }
+              } catch {
+                // If auto-login fails, user can simply click Launch Terminal -> redirect to login
+              }
+            }
 
             const savedPayment = localStorage.getItem("apex_reg_payment");
             if (savedPayment) {
@@ -452,52 +500,42 @@ export default function RegisterWizardPage() {
             setIsRefreshingStatus(false);
             return;
           }
-        } catch (backendErr: any) {
-          const status = backendErr?.response?.status;
-          const data = backendErr?.response?.data;
-          const apiStatus = (data?.status || data?.user_status || "").toString();
-          const detail = data?.detail || data?.message || data?.rejection_reason || "";
 
-          if (isStatusApproved(apiStatus)) {
-            setSubmissionStatus("approved");
-            setAccountComplete(true);
-            setRefreshNotice({ type: "success", text: "Payment confirmed! Your account is active." });
-            setIsRefreshingStatus(false);
-            return;
-          }
-
-          if (
-            isStatusRejected(apiStatus) ||
-            apiStatus.toUpperCase().includes("REJECT") ||
-            detail.toLowerCase().includes("reject")
-          ) {
+          if (isStatusRejected(userStatus) || paymentStatus === "REJECTED") {
+            const reason =
+              res?.rejection_reason ||
+              "Your payment submission was rejected by the administrator. Please submit a valid Transaction ID.";
             setSubmissionStatus("rejected");
-            setRejectionReason(
-              detail ||
-                data?.rejection_reason ||
-                "Your payment proof was rejected by administration. Please verify your transaction ID or upload a new receipt."
-            );
-            setRefreshNotice({ type: "error", text: "Payment was rejected by admin." });
+            setRejectionReason(reason);
+            setRefreshNotice({
+              type: "error",
+              text: "Payment proof was rejected by administration.",
+            });
+
+            const savedPayment = localStorage.getItem("apex_reg_payment");
+            if (savedPayment) {
+              try {
+                const parsed = JSON.parse(savedPayment);
+                parsed.status = "REJECTED";
+                parsed.rejectionReason = reason;
+                localStorage.setItem("apex_reg_payment", JSON.stringify(parsed));
+              } catch {}
+            }
             setIsRefreshingStatus(false);
             return;
           }
 
-          if (status === 403 && (isStatusPending(apiStatus) || apiStatus === "PENDING_APPROVAL")) {
+          if (userStatus === "PENDING_APPROVAL" || paymentStatus === "PENDING") {
             setSubmissionStatus("pending");
             setRefreshNotice({
               type: "info",
-              text: "Payment is still queued for administrator audit. Please check again shortly.",
+              text: "Status refreshed: Payment verification is in progress.",
             });
             setIsRefreshingStatus(false);
             return;
           }
-
-          if (status === 403 && apiStatus === "PENDING_PAYMENT") {
-            setSubmissionStatus("rejected");
-            setRejectionReason(detail || "Payment proof not recognized. Please submit your Easypaisa receipt.");
-            setIsRefreshingStatus(false);
-            return;
-          }
+        } catch (apiErr: any) {
+          console.warn("[Register] Payment status lookup error:", apiErr);
         }
       }
 
@@ -1321,7 +1359,17 @@ export default function RegisterWizardPage() {
 
                   <button
                     type="button"
-                    onClick={() => router.push("/dashboard/live-signals")}
+                    onClick={() => {
+                      const hasToken =
+                        typeof window !== "undefined" &&
+                        (localStorage.getItem("access_token") || localStorage.getItem("apex_token"));
+                      if (hasToken) {
+                        router.push("/dashboard/live-signals");
+                      } else {
+                        const emailParam = formData.email ? `?email=${encodeURIComponent(formData.email)}` : "";
+                        router.push(`/auth/login${emailParam}`);
+                      }
+                    }}
                     className="w-full py-3 rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-md shadow-primary/20 cursor-pointer"
                   >
                     <span>Launch Trading Terminal</span>
@@ -1556,7 +1604,17 @@ export default function RegisterWizardPage() {
 
                   <button
                     type="button"
-                    onClick={() => router.push("/dashboard/live-signals")}
+                    onClick={() => {
+                      const hasToken =
+                        typeof window !== "undefined" &&
+                        (localStorage.getItem("access_token") || localStorage.getItem("apex_token"));
+                      if (hasToken) {
+                        router.push("/dashboard/live-signals");
+                      } else {
+                        const emailParam = formData.email ? `?email=${encodeURIComponent(formData.email)}` : "";
+                        router.push(`/auth/login${emailParam}`);
+                      }
+                    }}
                     className="w-full py-3 rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-md shadow-primary/20 cursor-pointer"
                   >
                     <span>Launch Trading Terminal</span>

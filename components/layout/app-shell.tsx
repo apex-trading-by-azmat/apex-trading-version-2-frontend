@@ -85,15 +85,21 @@ function StatusDot({ status }: { status: "online" | "offline" | "warn" }) {
   );
 }
 
+export interface AppShellProps {
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+  wsConnected?: boolean;
+  extensionConnected?: boolean;
+}
+
 export function AppShell({
   title,
   description,
   children,
-}: {
-  title: string;
-  description?: string;
-  children: React.ReactNode;
-}) {
+  wsConnected,
+  extensionConnected: extensionConnectedProp,
+}: AppShellProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -107,63 +113,103 @@ export function AppShell({
     full_name?: string;
   } | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
-  const [extensionConnected, setExtensionConnected] = useState(false);
-  const [monitoringActive, setMonitoringActive] = useState(false);
+
+  type ExtensionHealthDetail = {
+    is_connected?: boolean;
+    status_reason?: string;
+    has_quotex_tab?: boolean;
+    is_monitoring?: boolean;
+    is_authenticated?: boolean;
+    is_receiving_data?: boolean;
+    last_event_at?: string;
+    active_pair?: string;
+    error?: string;
+  };
+
+  const [extHealth, setExtHealth] = useState<ExtensionHealthDetail | null>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem("apex_ext_health");
+        return cached ? JSON.parse(cached) : null;
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  });
+
+  const [monitoringActive, setMonitoringActive] = useState<boolean>(
+    wsConnected ?? false,
+  );
+
+  // Synchronize wsConnected prop if supplied by caller
+  useEffect(() => {
+    if (typeof wsConnected === "boolean") {
+      setMonitoringActive(wsConnected);
+    }
+  }, [wsConnected]);
 
   // Session from /auth/session — source of truth for session_id
   const { session, loading: sessionLoading } = useSession();
 
   const sessionId = session?.session_id ?? null;
 
-  // Dynamic extension connection status from localStorage + custom events
+  // Dynamic extension connection status and WebSocket state listeners
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const checkExtension = () => {
-      const sid =
-        localStorage.getItem("apex_session_id") ||
-        localStorage.getItem("session_id") ||
-        null;
-      setExtensionConnected(!!sid && !!sessionId);
-      setMonitoringActive(!!sid);
+    // Listen for WebSocket connection status from useSignalsWebSocket
+    const handleWsStatus = (e: Event) => {
+      const custom = e as CustomEvent<{ isConnected?: boolean }>;
+      if (typeof custom.detail?.isConnected === "boolean") {
+        setMonitoringActive(custom.detail.isConnected);
+      }
     };
 
-    checkExtension();
+    // Listen for real-time extension health checks from web_auth_sync content script
+    const handleExtHealth = (e: Event) => {
+      const custom = e as CustomEvent<ExtensionHealthDetail>;
+      if (custom.detail) {
+        setExtHealth(custom.detail);
+      }
+    };
 
+    // Backwards compatibility legacy event listeners
     const handleExtConnect = () => {
-      setExtensionConnected(true);
-      setMonitoringActive(true);
+      setExtHealth((prev) => ({
+        ...prev,
+        is_connected: true,
+        has_quotex_tab: true,
+        is_monitoring: true,
+        is_receiving_data: true,
+      }));
     };
     const handleExtDisconnect = () => {
-      setExtensionConnected(false);
-      setMonitoringActive(false);
+      setExtHealth((prev) => ({
+        ...prev,
+        is_connected: false,
+        status_reason: "DISCONNECTED",
+      }));
     };
 
+    window.addEventListener("apex_ws_status_change", handleWsStatus);
+    window.addEventListener("apex_extension_health_status", handleExtHealth);
     window.addEventListener("apex_extension_connected", handleExtConnect);
     window.addEventListener("apex_extension_disconnected", handleExtDisconnect);
-    window.addEventListener("apex_monitoring_started", () =>
-      setMonitoringActive(true),
-    );
-    window.addEventListener("apex_monitoring_stopped", () =>
-      setMonitoringActive(false),
-    );
+
+    // Request immediate health ping from extension
+    window.dispatchEvent(new CustomEvent("apex_query_extension_health"));
 
     return () => {
+      window.removeEventListener("apex_ws_status_change", handleWsStatus);
+      window.removeEventListener("apex_extension_health_status", handleExtHealth);
       window.removeEventListener("apex_extension_connected", handleExtConnect);
       window.removeEventListener(
         "apex_extension_disconnected",
         handleExtDisconnect,
       );
-      window.removeEventListener(
-        "apex_monitoring_started",
-        () => setMonitoringActive(true),
-      );
-      window.removeEventListener(
-        "apex_monitoring_stopped",
-        () => setMonitoringActive(false),
-      );
     };
-  }, [sessionId]);
+  }, []);
 
   useEffect(() => {
     // Wait for session to load before checking auth state
@@ -234,6 +280,46 @@ export function AppShell({
         </div>
       </div>
     );
+  }
+
+  // Compute Extension Connection State & Tooltips
+  const isExtConnected =
+    extensionConnectedProp !== undefined
+      ? extensionConnectedProp
+      : Boolean(extHealth?.is_connected);
+
+  let extLabel = "Extension Disconnected";
+  let extDotStatus: "online" | "offline" | "warn" = "offline";
+  let extTooltip = "Apex Chrome extension is not detected or inactive.";
+
+  if (isExtConnected) {
+    extLabel = "Extension Connected";
+    extDotStatus = "online";
+    extTooltip = extHealth?.active_pair
+      ? `Quotex chart active (${extHealth.active_pair}) · Streaming real-time ticks to backend.`
+      : "Quotex chart connected · Streaming real-time ticks to backend.";
+  } else if (extHealth) {
+    if (extHealth.status_reason === "QUOTEX_TAB_NOT_FOUND" || extHealth.has_quotex_tab === false) {
+      extLabel = "Quotex Tab Closed";
+      extDotStatus = "warn";
+      extTooltip = "Apex extension is active, but no Quotex/QxBroker chart tab is open.";
+    } else if (extHealth.status_reason === "MONITORING_PAUSED" || extHealth.is_monitoring === false) {
+      extLabel = "Syncing Telemetry";
+      extDotStatus = "warn";
+      extTooltip = "Quotex tab open. Auto-connecting telemetry stream...";
+    } else if (extHealth.status_reason === "WAITING_FOR_TICKS" || extHealth.is_receiving_data === false) {
+      extLabel = "Waiting for Ticks";
+      extDotStatus = "warn";
+      extTooltip = "Quotex chart open and monitoring active. Waiting for incoming ticks...";
+    } else if (extHealth.status_reason === "UNAUTHENTICATED") {
+      extLabel = "Extension Login Required";
+      extDotStatus = "warn";
+      extTooltip = "Apex extension session unauthenticated. Please log in via the extension popup.";
+    } else {
+      extLabel = "Extension Disconnected";
+      extDotStatus = "offline";
+      extTooltip = "Extension disconnected or telemetry not streaming.";
+    }
   }
 
   return (
@@ -483,8 +569,13 @@ export function AppShell({
 
           <div className="flex items-center gap-2">
             <div
+              title={
+                monitoringActive
+                  ? "Connected to Apex FastAPI signals WebSocket feed (/ws/signals) · Real-time 60s signal engine active."
+                  : "Disconnected from backend WebSocket. Reconnection in progress..."
+              }
               className={cn(
-                "hidden sm:flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-all",
+                "hidden sm:flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-all select-none cursor-default",
                 monitoringActive
                   ? "bg-up/10 border-up/20 text-up"
                   : "bg-secondary border-border text-muted-foreground",
@@ -498,19 +589,18 @@ export function AppShell({
             </div>
 
             <div
+              title={extTooltip}
               className={cn(
-                "hidden md:flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-all",
-                extensionConnected
+                "hidden md:flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-all select-none cursor-default",
+                isExtConnected
                   ? "bg-up/10 border-up/20 text-up"
+                  : extDotStatus === "warn"
+                  ? "bg-warning/10 border-warning/20 text-warning"
                   : "bg-down/8 border-down/20 text-down",
               )}
             >
-              <StatusDot status={extensionConnected ? "online" : "offline"} />
-              <span>
-                {extensionConnected
-                  ? "Extension Connected"
-                  : "Extension Disconnected"}
-              </span>
+              <StatusDot status={extDotStatus} />
+              <span>{extLabel}</span>
             </div>
 
             <ThemeToggle variant="pill" />

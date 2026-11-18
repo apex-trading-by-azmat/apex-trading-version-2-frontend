@@ -43,7 +43,8 @@ export interface SignalItem {
 
 interface LiveSignalsSliderProps {
   signals: SignalItem[];
-  activeSignalId: string;
+  activeSignalId?: string | null;
+  activeAsset?: string | null;
   onSelectSignal: (id: string) => void;
   isFetching?: boolean;
 }
@@ -51,6 +52,7 @@ interface LiveSignalsSliderProps {
 export function LiveSignalsSlider({
   signals,
   activeSignalId,
+  activeAsset,
   onSelectSignal,
   isFetching = false,
 }: LiveSignalsSliderProps) {
@@ -365,7 +367,13 @@ export function LiveSignalsSlider({
           >
             {filteredSignals.map((sig, idx) => {
               const sigKey = sig.id || `slider-pair-${sig.asset || idx}`;
-              const isSelected = activeSignalId === sig.id;
+              const normalizeKey = (sym?: string | null) => {
+                if (!sym) return "";
+                return sym.toUpperCase().replace(/[\/\s\(\)\-_]/g, "").replace(/OTC$/, "");
+              };
+              const isSelected =
+                (Boolean(activeSignalId) && Boolean(sig.id) && activeSignalId === sig.id) ||
+                (Boolean(activeAsset) && Boolean(sig.asset) && normalizeKey(activeAsset) === normalizeKey(sig.asset));
               const isSigUp = sig.direction === "UP";
               const isSigDown = sig.direction === "DOWN";
               const isSigWait = sig.direction === "WAIT";

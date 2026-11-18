@@ -13,7 +13,8 @@ const rules = [
 ];
 
 export function SignalHero() {
-  const { activeChartAsset, activeChartPayout, activeSignal } = useSignalsWebSocket();
+  const { activeChartAsset, activeChartPayout, activeSignal: rawSignal } = useSignalsWebSocket();
+  const activeSignal = rawSignal as any;
   const currentAsset = activeChartAsset || activeSignal?.asset || "EURUSD_OTC";
   const { base, quote } = parsePair(currentAsset);
   const isOtc = currentAsset.toUpperCase().includes("OTC");

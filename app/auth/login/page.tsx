@@ -20,6 +20,10 @@ export default function LoginPage() {
       } else if (params.get("unauthorized") === "true") {
         setAuthNotice("Please sign in to access the Apex Signal Trading terminal.");
       }
+      const emailParam = params.get("email");
+      if (emailParam) {
+        setEmail(emailParam);
+      }
     }
   }, []);
 
@@ -59,11 +63,43 @@ export default function LoginPage() {
         )}
 
         {isError && (
-          <div className="mb-4 p-3 rounded-lg bg-down/10 border border-down/30 text-down text-xs flex items-start gap-2 shadow-sm">
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-            <div className="flex-1 leading-relaxed">
-              {(error as { message?: string })?.message || "Failed to sign in. Please verify your credentials."}
+          <div className="mb-4 p-3.5 rounded-lg bg-down/10 border border-down/30 text-down text-xs space-y-2 shadow-sm">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <div className="flex-1 leading-relaxed">
+                {(error as { message?: string })?.message || "Failed to sign in. Please verify your credentials."}
+              </div>
             </div>
+            {((error as any)?.status === 403 ||
+              (error as any)?.data?.user_status === "PENDING_APPROVAL" ||
+              (error as any)?.message?.toLowerCase().includes("pending approval") ||
+              (error as any)?.message?.toLowerCase().includes("underway")) && (
+              <div className="pt-2 border-t border-down/20 flex items-center justify-between">
+                <span className="text-[11px] text-muted-foreground">
+                  Awaiting administrator audit?
+                </span>
+                <Link
+                  href={`/auth/register?step=3${email ? `&email=${encodeURIComponent(email)}` : ""}`}
+                  className="px-2.5 py-1 rounded bg-down/20 hover:bg-down/30 text-[11px] font-semibold text-down transition-colors"
+                >
+                  Check Verification &rarr;
+                </Link>
+              </div>
+            )}
+            {((error as any)?.data?.user_status === "PENDING_PAYMENT" ||
+              (error as any)?.message?.toLowerCase().includes("pending payment")) && (
+              <div className="pt-2 border-t border-down/20 flex items-center justify-between">
+                <span className="text-[11px] text-muted-foreground">
+                  Payment proof required:
+                </span>
+                <Link
+                  href={`/auth/register?step=2${email ? `&email=${encodeURIComponent(email)}` : ""}`}
+                  className="px-2.5 py-1 rounded bg-down/20 hover:bg-down/30 text-[11px] font-semibold text-down transition-colors"
+                >
+                  Submit Payment &rarr;
+                </Link>
+              </div>
+            )}
           </div>
         )}
 

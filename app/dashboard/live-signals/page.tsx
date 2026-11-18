@@ -40,11 +40,9 @@ import {
   TradeOutcomeModal,
   OutcomeType,
 } from "@/components/dashboard/trade-outcome-modal";
-import { LiveSignalsSlider } from "@/components/dashboard/live-signals-slider";
 import { useRecentSignals } from "@/hook/useSignals";
 import { useSignalsWebSocket } from "@/hook/useSignalsWebSocket";
 import { useSession } from "@/hook/useSession";
-import { useWatchlist } from "@/hook/useMarketData";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type SignalMode = "UP" | "DOWN" | "WAIT";
@@ -253,101 +251,26 @@ export default function LiveSignalsPage() {
 
   // WebSocket: real-time signal feed from backend (signal/qualified, signal/wait, connected, watchlist/updated)
   const {
-    activeSignal: wsActiveSignal,
-    activeChartAsset: wsActiveChartAsset,
+    activeSignal: wsActiveSignalRaw,
+    activeChartAsset: wsActiveChartAssetRaw,
     activeChartPayout: wsActiveChartPayout,
-    watchlist: wsWatchlist,
+    isConnected: isWsConnected,
   } = useSignalsWebSocket();
 
+  const wsActiveSignal = wsActiveSignalRaw as SignalData | null;
+  const wsActiveChartAsset = wsActiveChartAssetRaw as string | null;
+
   // Session from /auth/session — source of truth for auth state
-  const { session: authSession, loading: sessionLoading } = useSession();
+  const { session: authSession } = useSession();
 
-  // Watchlist pairs from GET /extension/watchlist/?session_id=<session_id> (initial hydration only)
-  const watchlistSessionId = authSession?.session_id ?? null;
-  const {
-    data: restWatchlist,
-    isLoading: watchlistLoading,
-    refetch: refetchWatchlist,
-  } = useWatchlist(watchlistSessionId as any, {
-    refetchInterval: false,
-    staleTime: Infinity,
-    refetchOnWindowFocus: false,
-    enabled: !!watchlistSessionId,
-  });
+  const normalizeAssetKey = useCallback((sym?: string | null) => {
+    if (!sym) return "";
+    return sym.toUpperCase().replace(/[\/\s\(\)\-_]/g, "").replace(/OTC$/, "");
+  }, []);
 
-  // Effective watchlist: prefers real-time WebSocket push, falls back to REST initial hydration
-  const effectiveWatchlist = useMemo(() => {
-    if (Array.isArray(wsWatchlist) && wsWatchlist.length > 0) {
-      return wsWatchlist;
-    }
-    return restWatchlist;
-  }, [wsWatchlist, restWatchlist]);
-
-  // Build watchlist asset set for filtering signalsList
-  const watchlistAssetSet = useMemo(() => {
-    if (!effectiveWatchlist) return new Set<string>();
-
-    let list: any[] = [];
-
-    if (typeof effectiveWatchlist === "string") {
-      try {
-        list = JSON.parse(effectiveWatchlist);
-      } catch {
-        return new Set<string>();
-      }
-    } else if (Array.isArray(effectiveWatchlist)) {
-      list = effectiveWatchlist;
-    } else if (typeof effectiveWatchlist === "object") {
-      // Try direct array keys on the root object
-      for (const key of [
-        "watchlist",
-        "data",
-        "items",
-        "signals",
-        "pairs",
-        "records",
-        "list",
-        "result",
-        "response",
-        "payload",
-      ]) {
-        if (Array.isArray(effectiveWatchlist[key])) {
-          list = effectiveWatchlist[key];
-          break;
-        }
-      }
-      // Try deeply nested structures (e.g. { data: { watchlist: [...] } })
-      if (!Array.isArray(list) && effectiveWatchlist.data && typeof effectiveWatchlist.data === "object") {
-        for (const key of [
-          "watchlist",
-          "data",
-          "items",
-          "signals",
-          "pairs",
-          "records",
-          "list",
-        ]) {
-          if (Array.isArray(effectiveWatchlist.data[key])) {
-            list = effectiveWatchlist.data[key];
-            break;
-          }
-        }
-      }
-    }
-
-    const set = new Set<string>();
-    for (const item of list) {
-      if (item && item.asset) {
-        set.add(
-          item.asset
-            .toUpperCase()
-            .replace(/[\/\s\(\)\-_]/g, "")
-            .replace(/OTC$/, ""),
-        );
-      }
-    }
-    return set;
-  }, [effectiveWatchlist]);
+  // Strict Single Active Asset currently focused in Quotex
+  const monitoredAsset = wsActiveChartAsset || "EURUSD_OTC";
+  const monitoredKey = normalizeAssetKey(monitoredAsset);
 
   // Normalize API data to array (handles raw JSON string, array, or envelope object from backend)
   const extractSignalArray = useCallback((raw: any): SignalData[] => {
@@ -418,150 +341,6 @@ export default function LiveSignalsPage() {
     return isNaN(t) ? 0 : t;
   }, []);
 
-  const signalsList: SignalData[] = useMemo(() => {
-    const list = extractSignalArray(apiSignals);
-    if (wsActiveSignal && wsActiveSignal.id && wsActiveSignal.direction !== "WAIT") {
-      const idx = list.findIndex(
-        (s) => s.id === wsActiveSignal.id || (s.asset === wsActiveSignal.asset && s.created_at === wsActiveSignal.created_at)
-      );
-      if (idx >= 0) {
-        list[idx] = { ...list[idx], ...wsActiveSignal };
-      } else {
-        list.unshift(wsActiveSignal);
-      }
-    }
-    // Sort by created_at descending (newest first) so signalsList[0] is always the latest backend signal.
-    return list.sort((a, b) => {
-      const ta = parseSignalTime(a.created_at);
-      const tb = parseSignalTime(b.created_at);
-      if (ta !== tb) return tb - ta;
-      return 0;
-    });
-  }, [apiSignals, wsActiveSignal, extractSignalArray, parseSignalTime]);
-
-  const hasLiveSignals = signalsList.length > 0;
-
-  // Active watchlist pairs from GET /extension/watchlist/?session_id=<session_id>
-  // Combined Unique Active Pairs for the Live Signals Stream Slider
-  // Only signals whose asset is in the active watchlist are displayed!
-  const displaySignals: SignalData[] = useMemo(() => {
-    const seenAssets = new Set<string>();
-    const uniqueList: SignalData[] = [];
-
-    const normalizeKey = (sym?: string) => {
-      if (!sym) return "";
-      return sym.toUpperCase().replace(/[\/\s\(\)\-_]/g, "").replace(/OTC$/, "");
-    };
-
-    // Build the strict set of assets: user's pinned tabs + active chart pair from Quotex
-    const allowedAssetSet = new Set<string>(watchlistAssetSet);
-    if (wsActiveChartAsset) {
-      const activeKey = normalizeKey(wsActiveChartAsset);
-      if (activeKey) allowedAssetSet.add(activeKey);
-    }
-
-    // STRICT: When the user first connects and has not pinned tabs or opened an active chart yet,
-    // the watchlist is completely empty. Do NOT show unpinned/historical assets!
-    if (allowedAssetSet.size === 0) {
-      return [];
-    }
-
-    // Map each signal from signalsList, deduplicating by currency pair
-    // STRICTLY include only signals for assets the user is actively monitoring/pinned!
-    for (const sig of signalsList) {
-      const normKey = normalizeKey(sig.asset);
-      if (!normKey || seenAssets.has(normKey)) continue;
-
-      // Filter out any pair that is not in the user's pinned tabs / active chart
-      if (!allowedAssetSet.has(normKey)) continue;
-
-      seenAssets.add(normKey);
-
-      // Candle freshness check — stale signals (previous minute) show WAIT instead of old UP/DOWN
-      let signalData = sig;
-      if (nowDate && sig.created_at) {
-        const sigTime = parseSignalTime(sig.created_at);
-        if (sigTime) {
-          const sigDate = new Date(sigTime);
-          if (
-            sigDate.getMinutes() !== nowDate.getMinutes() ||
-            sigDate.getHours() !== nowDate.getHours()
-          ) {
-            signalData = {
-              ...sig,
-              direction: "WAIT",
-              status_code: sig.status_code || "CANDLE_EXPIRED",
-              is_qualified: false,
-              confidence_score: sig.confidence_score ?? 0,
-              consensus_count: sig.consensus_count ?? 0,
-              votes: sig.votes || WAIT_SIGNAL.votes,
-            } as SignalData;
-          }
-        }
-      }
-
-      uniqueList.push(signalData);
-    }
-
-    // Also include any watchlisted/pinned assets that don't have a recent historical signal yet
-    // so they appear on the slider and can be monitored/selected!
-    if (Array.isArray(effectiveWatchlist)) {
-      for (const item of effectiveWatchlist) {
-        if (!item || !item.asset) continue;
-        const normKey = normalizeKey(item.asset);
-        if (!normKey || seenAssets.has(normKey)) continue;
-        seenAssets.add(normKey);
-        uniqueList.push({
-          ...WAIT_SIGNAL,
-          id: `watchlist-${item.asset}`,
-          asset: item.asset,
-          broker_payout: item.broker_payout || 0,
-          status_code: "WAITING_FOR_SETUP",
-          created_at: nowDate ? nowDate.toISOString() : undefined,
-        });
-      }
-    }
-
-    // Ensure the active chart pair from Quotex is always present in displaySignals
-    if (wsActiveChartAsset) {
-      const normKey = normalizeKey(wsActiveChartAsset);
-      if (normKey && !seenAssets.has(normKey)) {
-        seenAssets.add(normKey);
-        uniqueList.unshift({
-          ...WAIT_SIGNAL,
-          id: `active-${wsActiveChartAsset}`,
-          asset: wsActiveChartAsset,
-          broker_payout: wsActiveChartPayout || 0,
-          status_code: "WAITING_FOR_SETUP",
-          created_at: nowDate ? nowDate.toISOString() : undefined,
-        });
-      }
-    }
-
-    return uniqueList;
-  }, [signalsList, watchlistAssetSet, effectiveWatchlist, wsActiveChartAsset, wsActiveChartPayout, nowDate]);
-
-  // Auto-select the active chart asset from backend/extension when it changes
-  const [wsAssetSelected, setWsAssetSelected] = useState<string | null>(null);
-  useEffect(() => {
-    if (!wsActiveChartAsset || wsAssetSelected === wsActiveChartAsset) return;
-    setWsAssetSelected(wsActiveChartAsset);
-    const matching = displaySignals.find(
-      (s) =>
-        s.asset &&
-        s.asset.toUpperCase().trim() ===
-        wsActiveChartAsset.toUpperCase().trim(),
-    );
-    if (matching) {
-      setSelectedSignalId(matching.id);
-    } else {
-      setSelectedSignalId(null);
-    }
-  }, [wsActiveChartAsset, displaySignals, wsAssetSelected]);
-
-  // Determine if the newest backend signal belongs to the CURRENT 60-second candle
-  const latestBackendSignal = signalsList.length > 0 ? signalsList[0] : null;
-
   // Check if a qualified signal was generated for the active 60s candle window (under 65s age)
   const isSignalStillActiveCandle = useCallback(
     (sig: SignalData | null): boolean => {
@@ -576,212 +355,118 @@ export default function LiveSignalsPage() {
     [nowDate, parseSignalTime],
   );
 
-  // Check if a backend signal represents a WAIT/STANDBY state
-  const isBackendSignalWait = useCallback((sig: SignalData | null): boolean => {
-    if (!sig) return true;
-    if (sig.direction === "WAIT" || (sig.direction as string) === "STANDBY")
-      return true;
-    if (sig.is_qualified === false) return true;
+  const signalsList: SignalData[] = useMemo(() => {
+    // Strictly qualified trade signals (UP or DOWN) for the active monitored asset
+    const list = extractSignalArray(apiSignals).filter(
+      (s) =>
+        s &&
+        s.direction !== "WAIT" &&
+        (s.direction === "UP" || s.direction === "DOWN") &&
+        normalizeAssetKey(s.asset) === monitoredKey
+    );
     if (
-      sig.status_code &&
-      (sig.status_code.toUpperCase().includes("WAIT") ||
-        sig.status_code.toUpperCase().includes("STANDBY") ||
-        sig.status_code.toUpperCase().includes("NO_SETUP"))
+      wsActiveSignal &&
+      wsActiveSignal.id &&
+      wsActiveSignal.is_qualified &&
+      (wsActiveSignal.direction === "UP" || wsActiveSignal.direction === "DOWN") &&
+      normalizeAssetKey(wsActiveSignal.asset) === monitoredKey
     ) {
-      return true;
-    }
-    return false;
-  }, []);
-
-  // Dynamic Active Signal:
-  // 1. User manual inspection (clicking a specific pair/historical signal) takes immediate priority.
-  // 2. Real-time qualified signal from WebSocket or REST that belongs to the current 60s candle:
-  //    MUST stay displayed for the ENTIRE 60 seconds (seconds 00-30: Open, seconds 30-59: Locked/Expiring).
-  //    It should NEVER be prematurely cleared into WAIT at 30s while the trade is still running!
-  // 3. If no active qualified signal exists for the current candle:
-  //    Display dynamic WAIT/Standby state for the monitored pair.
-  const activeSignal: SignalData = useMemo(() => {
-    // ── 1. User's explicit inspection from slider or table ──
-    // Only show the selected signal if it belongs to the current 60-second candle.
-    // If it's stale (from a previous minute), show WAIT for THAT selected pair —
-    // not the standby pair's data.
-    if (selectedSignalId) {
-      const found = displaySignals.find((s) => s.id === selectedSignalId);
-      if (found) {
-        if (!nowDate || !found.created_at) {
-          // No timestamp — show this pair in WAIT standby state
-          return {
-            ...WAIT_SIGNAL,
-            id: found.id,
-            asset: found.asset,
-            broker_payout: found.broker_payout || (found.asset === wsActiveChartAsset ? wsActiveChartPayout : undefined) || 0,
-            status_code: "WAITING_FOR_SETUP",
-            is_qualified: false,
-            confidence_score: 0,
-            consensus_count: 0,
-            votes: WAIT_SIGNAL.votes,
-          };
-        }
-        const sigTime = parseSignalTime(found.created_at);
-        if (sigTime) {
-          const sigDate = new Date(sigTime);
-          // Signal belongs to current candle → show it
-          if (
-            sigDate.getMinutes() === nowDate.getMinutes() &&
-            sigDate.getHours() === nowDate.getHours()
-          ) {
-            return found;
-          }
-        }
-        // Signal is stale → show WAIT for this selected pair's asset
-        return {
-          ...WAIT_SIGNAL,
-          id: found.id,
-          asset: found.asset,
-          broker_payout: found.broker_payout || (found.asset === wsActiveChartAsset ? wsActiveChartPayout : undefined) || 0,
-          status_code: "CANDLE_EXPIRED",
-          is_qualified: false,
-          confidence_score: 0,
-          consensus_count: 0,
-          votes: WAIT_SIGNAL.votes,
-        };
-      }
-      // Selected signal not found → fall through to WAIT state below
-    }
-
-    // ── 2. Candle expiry check ──
-    // If we've crossed into a new 60-second candle, any signal from the previous
-    // minute is stale. Show WAIT immediately — no waiting for WebSocket signal/wait
-    // or REST polling delay.
-    if (nowDate && latestBackendSignal && latestBackendSignal.created_at) {
-      const signalTime = parseSignalTime(latestBackendSignal.created_at);
-      if (signalTime) {
-        const signalDate = new Date(signalTime);
-        if (
-          signalDate.getMinutes() !== nowDate.getMinutes() ||
-          signalDate.getHours() !== nowDate.getHours()
-        ) {
-          return {
-            ...latestBackendSignal,
-            direction: "WAIT",
-            status_code: latestBackendSignal.status_code || "CANDLE_EXPIRED",
-            is_qualified: false,
-            confidence_score: latestBackendSignal.confidence_score ?? 0,
-            consensus_count: latestBackendSignal.consensus_count ?? 0,
-            votes: latestBackendSignal.votes || WAIT_SIGNAL.votes,
-          };
-        }
+      const idx = list.findIndex(
+        (s) => s.id === wsActiveSignal.id || (s.asset === wsActiveSignal.asset && s.created_at === wsActiveSignal.created_at)
+      );
+      if (idx >= 0) {
+        list[idx] = { ...list[idx], ...wsActiveSignal };
+      } else {
+        list.unshift(wsActiveSignal);
       }
     }
+    // Sort by created_at descending (newest first)
+    return list.sort((a, b) => {
+      const ta = parseSignalTime(a.created_at);
+      const tb = parseSignalTime(b.created_at);
+      if (ta !== tb) return tb - ta;
+      return 0;
+    });
+  }, [apiSignals, wsActiveSignal, extractSignalArray, parseSignalTime, monitoredKey, normalizeAssetKey]);
 
-    // ── 3. Check for active qualified signal in the current candle from WebSocket ──
+  const hasLiveSignals = signalsList.length > 0;
+
+  // Determine if the newest backend signal belongs to the CURRENT 60-second candle
+  const latestBackendSignal = signalsList.length > 0 ? signalsList[0] : null;
+
+  // When a live qualified signal arrives via WebSocket, automatically clear historical inspection so cockpit displays the live trade
+  useEffect(() => {
     if (
       wsActiveSignal &&
       wsActiveSignal.is_qualified &&
       (wsActiveSignal.direction === "UP" || wsActiveSignal.direction === "DOWN") &&
-      (!wsActiveChartAsset || wsActiveSignal.asset?.toUpperCase().trim() === wsActiveChartAsset.toUpperCase().trim())
+      isSignalStillActiveCandle(wsActiveSignal) &&
+      normalizeAssetKey(wsActiveSignal.asset) === monitoredKey
     ) {
-      // If backend REST reports WAIT, the WebSocket UP/DOWN is stale — show WAIT instead
-      if (latestBackendSignal && isBackendSignalWait(latestBackendSignal)) {
-        return {
-          ...latestBackendSignal,
-          direction: "WAIT",
-          status_code: latestBackendSignal.status_code || "WAITING_FOR_SETUP",
-          is_qualified: false,
-          confidence_score: latestBackendSignal.confidence_score ?? 0,
-          consensus_count: latestBackendSignal.consensus_count ?? 0,
-          votes: latestBackendSignal.votes || WAIT_SIGNAL.votes,
-        };
+      setSelectedSignalId(null);
+    }
+  }, [wsActiveSignal, isSignalStillActiveCandle, monitoredKey, normalizeAssetKey]);
+
+  // Dynamic Active Signal for the single active monitored asset
+  const activeSignal: SignalData = useMemo(() => {
+    // 1. User manual inspection (clicking a historical signal in the feed table)
+    if (selectedSignalId) {
+      const found = signalsList.find((s) => s.id === selectedSignalId);
+      if (found) {
+        return found;
       }
+    }
+
+    // 2. Real-time qualified signal from WebSocket strictly for the active monitored pair in current 60s window
+    if (
+      wsActiveSignal &&
+      wsActiveSignal.is_qualified &&
+      (wsActiveSignal.direction === "UP" || wsActiveSignal.direction === "DOWN") &&
+      isSignalStillActiveCandle(wsActiveSignal) &&
+      normalizeAssetKey(wsActiveSignal.asset) === monitoredKey
+    ) {
       return wsActiveSignal;
     }
 
-    // ── 4. Check for active qualified signal in the current candle from REST polling ──
+    // 3. Active qualified signal from REST polling strictly for the active monitored pair in current 60s window
     if (
       latestBackendSignal &&
-      !isBackendSignalWait(latestBackendSignal) &&
+      latestBackendSignal.is_qualified &&
+      (latestBackendSignal.direction === "UP" || latestBackendSignal.direction === "DOWN") &&
       isSignalStillActiveCandle(latestBackendSignal) &&
-      (!wsActiveChartAsset || latestBackendSignal.asset?.toUpperCase().trim() === wsActiveChartAsset.toUpperCase().trim())
+      normalizeAssetKey(latestBackendSignal.asset) === monitoredKey
     ) {
       return latestBackendSignal;
     }
 
-    // ── 5. If WebSocket explicitly sent a WAIT signal with live telemetry, use its asset info ──
-    if (
-      wsActiveSignal &&
-      (wsActiveSignal.direction === "WAIT" ||
-        (wsActiveSignal.direction as string) === "STANDBY" ||
-        wsActiveSignal.is_qualified === false)
-    ) {
-      const activePair =
-        wsActiveChartAsset ||
-        wsActiveSignal.active_chart_asset ||
-        wsActiveSignal.asset ||
-        displaySignals[0]?.asset ||
-        "EURUSD_OTC";
-      const payout =
-        (activePair === wsActiveChartAsset ? wsActiveChartPayout : undefined) ??
-        wsActiveSignal.broker_payout ??
-        displaySignals.find((s) => s.asset === activePair)?.broker_payout ??
-        undefined;
-      return {
-        ...wsActiveSignal,
-        direction: "WAIT",
-        status_code: wsActiveSignal.status_code || "WAITING_FOR_SETUP",
-        is_qualified: false,
-        confidence_score: wsActiveSignal.confidence_score ?? 0,
-        consensus_count: wsActiveSignal.consensus_count ?? 0,
-        votes: wsActiveSignal.votes || WAIT_SIGNAL.votes,
-        asset: activePair,
-        broker_payout: payout,
-      };
-    }
-
-    // ── 6. REST API latest signal is WAIT/standby ──
-    if (
-      latestBackendSignal &&
-      isBackendSignalWait(latestBackendSignal) &&
-      (!wsActiveChartAsset || latestBackendSignal.asset?.toUpperCase().trim() === wsActiveChartAsset.toUpperCase().trim())
-    ) {
-      return {
-        ...latestBackendSignal,
-        direction: "WAIT",
-        status_code: latestBackendSignal.status_code || "WAITING_FOR_SETUP",
-        is_qualified: false,
-        confidence_score: latestBackendSignal.confidence_score ?? 0,
-        consensus_count: latestBackendSignal.consensus_count ?? 0,
-        votes: latestBackendSignal.votes || WAIT_SIGNAL.votes,
-      };
-    }
-
-    // ── 7. Default dynamic WAITING STATE for the monitored pair ──
-    const monitoredAsset =
-      wsActiveChartAsset ||
-      displaySignals[0]?.asset ||
-      "EURUSD_OTC";
-    const monitoredPayout =
-      wsActiveChartPayout ??
-      displaySignals.find((s) => s.asset === monitoredAsset)?.broker_payout ??
-      displaySignals[0]?.broker_payout ??
-      undefined;
-
+    // 4. Default clean Standby / WAIT State strictly for the active pair
     return {
       ...WAIT_SIGNAL,
-      id: "live-standby-wait",
+      id: `live-standby-${monitoredAsset}`,
       asset: monitoredAsset,
-      broker_payout: monitoredPayout,
+      broker_payout: wsActiveChartPayout ?? undefined,
+      direction: "WAIT",
+      status_code: "WAITING_FOR_SETUP",
+      is_qualified: false,
+      confidence_score: 0,
+      consensus_count: 0,
+      entry_baseline: undefined,
+      target_strike: undefined,
+      spot_price: undefined,
+      votes: WAIT_SIGNAL.votes,
       created_at: nowDate ? nowDate.toISOString() : undefined,
     };
   }, [
     selectedSignalId,
-    displaySignals,
-    wsActiveChartAsset,
+    signalsList,
+    wsActiveSignal,
     wsActiveChartPayout,
     latestBackendSignal,
-    isBackendSignalWait,
     isSignalStillActiveCandle,
+    monitoredAsset,
+    monitoredKey,
+    normalizeAssetKey,
     nowDate,
-    wsActiveSignal,
   ]);
 
   // Safe Currency Parsing
@@ -922,6 +607,7 @@ export default function LiveSignalsPage() {
     <AppShell
       title="Live Signals"
       description="Real-time 60-second fixed expiry signal engine powered by 4 independent strategies."
+      wsConnected={isWsConnected}
     >
       <div className="space-y-4 relative w-full max-w-full min-w-0">
         {/* Full-screen Win / Loss Celebration Modal */}
@@ -941,15 +627,7 @@ export default function LiveSignalsPage() {
           onClose={() => setOutcomeModal(null)}
         />
 
-        {/* ── LIVE SIGNALS STREAM SLIDER (WATCHLIST TICKER) ── */}
-        <LiveSignalsSlider
-          signals={displaySignals}
-          activeSignalId={activeSignal.id}
-          onSelectSignal={(id) =>
-            setSelectedSignalId((prev) => (prev === id || !id ? null : id))
-          }
-          isFetching={isSignalsFetching || sessionLoading || watchlistLoading}
-        />
+
 
         {/* ══════════════════════════════════════════════════════════════
             HERO SIGNAL COCKPIT (THE 3-COLUMN UNIFIED COMMAND CENTER)
@@ -1519,7 +1197,12 @@ export default function LiveSignalsPage() {
                     const sigKey = sig.id || `live-sig-${sig.asset || "pair"}-${sig.created_at || idx}`;
                     const isSigUp = sig.direction === "UP";
                     const isSigDown = sig.direction === "DOWN";
-                    const isSelected = activeSignal.id === sig.id;
+                    const isSelected = Boolean(selectedSignalId)
+                      ? selectedSignalId === sig.id || selectedSignalId === sigKey
+                      : Boolean(activeSignal?.id) &&
+                        activeSignal.is_qualified &&
+                        (activeSignal.direction === "UP" || activeSignal.direction === "DOWN") &&
+                        activeSignal.id === sig.id;
 
                     return (
                       <tr
