@@ -57,7 +57,7 @@ export default function ForgotPasswordPage() {
 
             <button
               type="submit"
-              className="w-full py-3 rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-md shadow-primary/20 cursor-pointer"
+              className="w-full py-3 rounded-lg bg-primary hover:bg-primary-hover text-black text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-md shadow-primary/20 cursor-pointer"
             >
               Send Recovery Link
               <ArrowRight className="w-4 h-4" />

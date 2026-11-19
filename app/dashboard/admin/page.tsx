@@ -165,9 +165,9 @@ export default function AdminPage() {
                         "px-2.5 py-1 rounded-lg text-xs font-mono transition-colors whitespace-nowrap",
                         filter === fb.key
                           ? fb.key === "all"
-                            ? "bg-primary text-white"
+                            ? "bg-primary text-black font-semibold"
                             : fb.key === "pending"
-                              ? "bg-warning text-white"
+                              ? "bg-warning text-black font-semibold"
                               : "bg-up text-white"
                           : "bg-secondary text-muted-foreground hover:text-foreground border border-border"
                       )}
@@ -276,7 +276,7 @@ export default function AdminPage() {
                               <div className="inline-flex items-center gap-1.5 justify-end">
                                 <button
                                   onClick={() => handleApprove(sub.id)}
-                                  className="px-2.5 py-1.5 rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-semibold whitespace-nowrap transition-colors shadow-sm inline-flex items-center gap-1"
+                                  className="px-2.5 py-1.5 rounded-lg bg-primary hover:bg-primary-hover text-black text-xs font-semibold whitespace-nowrap transition-colors shadow-sm inline-flex items-center gap-1"
                                 >
                                   <CheckCircle2 className="w-3.5 h-3.5" />
                                   Approve

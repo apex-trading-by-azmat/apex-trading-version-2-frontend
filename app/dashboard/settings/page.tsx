@@ -99,7 +99,7 @@ export default function SettingsPage() {
         </Card>
 
         <div className="flex justify-end pt-2">
-          <button className="px-4 py-2 rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-semibold transition-colors shadow-sm shadow-primary/20">
+          <button className="px-4 py-2 rounded-lg bg-primary hover:bg-primary-hover text-black text-xs font-semibold transition-colors shadow-sm shadow-primary/20">
             Save Preferences
           </button>
         </div>

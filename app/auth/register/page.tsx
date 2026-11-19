@@ -590,7 +590,7 @@ export default function RegisterWizardPage() {
             <div
               className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-mono transition-all ${
                 currentStep === 1
-                  ? "bg-primary text-white ring-4 ring-primary/20"
+                  ? "bg-primary text-black font-bold ring-4 ring-primary/20"
                   : currentStep > 1
                   ? "bg-up text-white"
                   : "bg-secondary text-muted-foreground border border-border"
@@ -617,7 +617,7 @@ export default function RegisterWizardPage() {
             <div
               className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-mono transition-all ${
                 currentStep === 2
-                  ? "bg-primary text-white ring-4 ring-primary/20"
+                  ? "bg-primary text-black font-bold ring-4 ring-primary/20"
                   : currentStep > 2
                   ? "bg-up text-white"
                   : "bg-secondary text-muted-foreground border border-border"
@@ -652,7 +652,7 @@ export default function RegisterWizardPage() {
                     ? "bg-down text-white ring-4 ring-down/20"
                     : isStatusApproved(submissionStatus)
                     ? "bg-up text-white ring-4 ring-up/20"
-                    : "bg-primary text-white ring-4 ring-primary/20"
+                    : "bg-primary text-black font-bold ring-4 ring-primary/20"
                   : accountComplete || isStatusApproved(submissionStatus)
                   ? "bg-up text-white"
                   : "bg-secondary text-muted-foreground border border-border"
@@ -777,7 +777,7 @@ export default function RegisterWizardPage() {
             <button
               type="submit"
               disabled={isRegistering}
-              className="w-full py-2.5 rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-md shadow-primary/20 disabled:opacity-60 cursor-pointer"
+              className="w-full py-2.5 rounded-lg bg-primary hover:bg-primary-hover text-black text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-md shadow-primary/20 disabled:opacity-60 cursor-pointer"
             >
               {isRegistering ? (
                 <>
@@ -1080,7 +1080,7 @@ export default function RegisterWizardPage() {
                   <button
                     type="submit"
                     disabled={isSubmittingPayment}
-                    className="flex-1 py-2.5 rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-md shadow-primary/20 disabled:opacity-60 cursor-pointer"
+                    className="flex-1 py-2.5 rounded-lg bg-primary hover:bg-primary-hover text-black text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-md shadow-primary/20 disabled:opacity-60 cursor-pointer"
                   >
                     {isSubmittingPayment ? (
                       <>
@@ -1177,11 +1177,11 @@ export default function RegisterWizardPage() {
                     setCurrentStep(3);
                     localStorage.setItem("apex_reg_step", "3");
                   }}
-                  className="w-full py-3 rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-md shadow-primary/20 cursor-pointer"
+                  className="w-full py-3 rounded-lg bg-primary hover:bg-primary-hover text-black text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-md shadow-primary/20 cursor-pointer"
                 >
-                  <CheckCircle2 className="w-4 h-4 text-white" />
+                  <CheckCircle2 className="w-4 h-4 text-black" />
                   <span>I have created an account and deposited $10</span>
-                  <ArrowRight className="w-4 h-4 text-white" />
+                  <ArrowRight className="w-4 h-4 text-black" />
                 </button>
 
                 <div className="flex items-center justify-between pt-1">
@@ -1260,7 +1260,7 @@ export default function RegisterWizardPage() {
                         setQuotexTraderIdSubmitted(true);
                         setSubmissionStatus("pending");
                       }}
-                      className="w-full flex-1 py-2.5 rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-md shadow-primary/20 cursor-pointer"
+                      className="w-full flex-1 py-2.5 rounded-lg bg-primary hover:bg-primary-hover text-black text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-md shadow-primary/20 cursor-pointer"
                     >
                       <span>Verify &amp; Activate</span>
                       <ArrowRight className="w-4 h-4" />
@@ -1359,6 +1359,7 @@ export default function RegisterWizardPage() {
 
                   <button
                     type="button"
+<<<<<<< Updated upstream
                     onClick={() => {
                       const hasToken =
                         typeof window !== "undefined" &&
@@ -1371,6 +1372,10 @@ export default function RegisterWizardPage() {
                       }
                     }}
                     className="w-full py-3 rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-md shadow-primary/20 cursor-pointer"
+=======
+                    onClick={() => router.push("/dashboard/live-signals")}
+                    className="w-full py-3 rounded-lg bg-primary hover:bg-primary-hover text-black text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-md shadow-primary/20 cursor-pointer"
+>>>>>>> Stashed changes
                   >
                     <span>Launch Trading Terminal</span>
                     <ArrowRight className="w-4 h-4" />
@@ -1460,7 +1465,7 @@ export default function RegisterWizardPage() {
                     <button
                       type="button"
                       onClick={handleResubmitPayment}
-                      className="w-full py-2.5 rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-md shadow-primary/20 cursor-pointer"
+                      className="w-full py-2.5 rounded-lg bg-primary hover:bg-primary-hover text-black text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-md shadow-primary/20 cursor-pointer"
                     >
                       <RotateCcw className="w-4 h-4" />
                       <span>Resubmit Correct Payment Proof (Step 2)</span>
@@ -1505,7 +1510,7 @@ export default function RegisterWizardPage() {
                         type="button"
                         onClick={handleRefreshStatus}
                         disabled={isRefreshingStatus}
-                        className="py-2 px-4 rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer disabled:opacity-60"
+                        className="py-2 px-4 rounded-lg bg-primary hover:bg-primary-hover text-black text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer disabled:opacity-60"
                       >
                         <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingStatus ? "animate-spin" : ""}`} />
                         <span>{isRefreshingStatus ? "Checking Status..." : "Refresh Payment Status"}</span>
@@ -1604,6 +1609,7 @@ export default function RegisterWizardPage() {
 
                   <button
                     type="button"
+<<<<<<< Updated upstream
                     onClick={() => {
                       const hasToken =
                         typeof window !== "undefined" &&
@@ -1616,6 +1622,10 @@ export default function RegisterWizardPage() {
                       }
                     }}
                     className="w-full py-3 rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-md shadow-primary/20 cursor-pointer"
+=======
+                    onClick={() => router.push("/dashboard/live-signals")}
+                    className="w-full py-3 rounded-lg bg-primary hover:bg-primary-hover text-black text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-md shadow-primary/20 cursor-pointer"
+>>>>>>> Stashed changes
                   >
                     <span>Launch Trading Terminal</span>
                     <ArrowRight className="w-4 h-4" />

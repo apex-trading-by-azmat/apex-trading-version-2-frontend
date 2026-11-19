@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
-import { Space_Grotesk, JetBrains_Mono } from "next/font/google";
+import { Montserrat, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/theme-provider";
 import { QueryProvider } from "@/components/query-provider";
 
-const spaceGrotesk = Space_Grotesk({
+const montserrat = Montserrat({
   subsets: ["latin"],
   variable: "--font-sans",
-  weight: ["300", "400", "500", "600", "700"],
+  weight: ["300", "400", "500", "600", "700", "800", "900"],
 });
 
 const jetbrainsMono = JetBrains_Mono({
@@ -30,15 +30,15 @@ export default function RootLayout({
       lang="en"
       suppressHydrationWarning
       className={cn(
-        "h-full antialiased dark",
-        spaceGrotesk.variable,
+        "h-full antialiased dark font-sans",
+        montserrat.variable,
         jetbrainsMono.variable
       )}
       data-theme="dark"
     >
       <body
         suppressHydrationWarning
-        className="min-h-full flex flex-col bg-background text-foreground transition-colors duration-200"
+        className="min-h-full flex flex-col bg-background text-foreground transition-colors duration-200 font-sans"
       >
         <ThemeProvider
           attribute={["class", "data-theme"]}

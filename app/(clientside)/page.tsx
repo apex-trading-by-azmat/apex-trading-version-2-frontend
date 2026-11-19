@@ -170,7 +170,7 @@ export default function ClientLandingPage() {
         <div className="flex flex-wrap items-center justify-center gap-3.5 pt-2">
           <Link
             href="/auth/register"
-            className="px-8 py-3.5 rounded-xl bg-primary hover:bg-primary-hover text-white text-sm font-semibold transition-all flex items-center gap-2 shadow-xl shadow-primary/25 hover:shadow-primary/40 hover:-translate-y-0.5"
+            className="px-8 py-3.5 rounded-xl bg-primary hover:bg-primary-hover text-black text-sm font-bold transition-all flex items-center gap-2 shadow-xl shadow-primary/25 hover:shadow-primary/40 hover:-translate-y-0.5"
           >
             Get 30-Day License ($25)
             <ArrowRight className="w-4 h-4" />
@@ -728,7 +728,7 @@ export default function ClientLandingPage() {
 
           <Link
             href="/auth/register"
-            className="w-full py-3.5 rounded-xl bg-primary hover:bg-primary-hover text-white text-sm font-semibold transition-all flex items-center justify-center gap-2 shadow-xl shadow-primary/25"
+            className="w-full py-3.5 rounded-xl bg-primary hover:bg-primary-hover text-black text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-xl shadow-primary/25"
           >
             Start Registration &amp; Submit Payment
             <ArrowRight className="w-4 h-4" />
@@ -795,7 +795,7 @@ export default function ClientLandingPage() {
         <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
           <Link
             href="/auth/register"
-            className="px-8 py-3.5 rounded-xl bg-primary hover:bg-primary-hover text-white text-sm font-semibold transition-all flex items-center gap-2 shadow-xl shadow-primary/30 hover:-translate-y-0.5"
+            className="px-8 py-3.5 rounded-xl bg-primary hover:bg-primary-hover text-black text-sm font-bold transition-all flex items-center gap-2 shadow-xl shadow-primary/30 hover:-translate-y-0.5"
           >
             Create Account &amp; Activate License
             <ArrowRight className="w-4 h-4" />

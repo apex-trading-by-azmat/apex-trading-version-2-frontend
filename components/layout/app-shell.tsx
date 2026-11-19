@@ -27,6 +27,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { useState, useEffect } from "react";
 import { useSession } from "@/hook/useSession";
 import { getActiveLicense } from "@/lib/auth-flow";
+import { TerminalLoading } from "./terminal-loading";
 
 const NAV_SECTIONS = [
   {
@@ -262,24 +263,7 @@ export function AppShell({
   }, []);
 
   if (!authChecked) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-6">
-        <div className="w-full max-w-sm text-center">
-          <div className="flex justify-center mb-4">
-            <div className="relative flex h-8 w-8">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-8 w-8 bg-primary shadow-[0_0_15px_rgba(59,130,246,0.6)]"></span>
-            </div>
-          </div>
-          <h2 className="text-sm font-semibold text-foreground mb-2">
-            Verifying terminal authorization…
-          </h2>
-          <p className="text-xs font-mono text-muted-foreground animate-pulse">
-            Initializing secure session
-          </p>
-        </div>
-      </div>
-    );
+    return <TerminalLoading />;
   }
 
   // Compute Extension Connection State & Tooltips

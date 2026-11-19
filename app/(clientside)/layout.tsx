@@ -51,7 +51,7 @@ export default function ClientsideLayout({
             </Link>
             <Link
               href="/auth/register"
-              className="px-3.5 py-1.5 rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-semibold transition-all flex items-center gap-1.5 shadow-lg shadow-primary/20"
+              className="px-3.5 py-1.5 rounded-lg bg-primary hover:bg-primary-hover text-black text-xs font-semibold transition-all flex items-center gap-1.5 shadow-lg shadow-primary/20"
             >
               Get 30-Day Pass ($25)
               <ArrowRight className="w-3.5 h-3.5" />

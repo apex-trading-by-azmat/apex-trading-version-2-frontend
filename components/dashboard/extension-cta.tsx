@@ -147,7 +147,7 @@ export function ExtensionCTA() {
             <a
               href="/downloads/apex-trading-extension.zip"
               download="apex-trading-extension.zip"
-              className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg bg-primary hover:bg-primary-hover text-white font-semibold text-xs transition-all shadow-md shadow-primary/20 cursor-pointer shrink-0"
+              className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg bg-primary hover:bg-primary-hover text-black font-semibold text-xs transition-all shadow-md shadow-primary/20 cursor-pointer shrink-0"
             >
               <Download className="w-3.5 h-3.5" />
               <span>Download Extension (.zip)</span>

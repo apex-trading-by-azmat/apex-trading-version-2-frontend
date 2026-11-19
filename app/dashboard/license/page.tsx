@@ -215,7 +215,7 @@ export default function LicensePage() {
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="px-4 py-2 rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-semibold whitespace-nowrap transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-4 py-2 rounded-lg bg-primary hover:bg-primary-hover text-black text-xs font-semibold whitespace-nowrap transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isSubmitting ? <RefreshCw className="w-4 h-4 animate-spin" /> : "Apply Key"}
                   </button>
