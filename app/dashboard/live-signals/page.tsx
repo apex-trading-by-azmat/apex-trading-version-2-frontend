@@ -101,7 +101,14 @@ const WAIT_SIGNAL: SignalData = {
       strategy_name: "CANDLESTICK_PRICE_ACTION",
       direction: "WAIT",
       confidence_score: 0,
-      reason_code: "SR_NO_SETUP",
+      reason_code: "CANDLE_NO_PATTERN",
+      eligible: true,
+    },
+    {
+      strategy_name: "FAIR_VALUE_GAP",
+      direction: "WAIT",
+      confidence_score: 0,
+      reason_code: "WAIT_NO_CONFIRMED_FVG_RETEST",
       eligible: true,
     },
     {
@@ -118,13 +125,6 @@ const WAIT_SIGNAL: SignalData = {
       reason_code: "NONE",
       eligible: true,
     },
-    {
-      strategy_name: "BOLLINGER_BANDS_BREAKOUT",
-      direction: "WAIT",
-      confidence_score: 0,
-      reason_code: "BB_NO_BREAKOUT",
-      eligible: true,
-    },
   ],
 };
 
@@ -132,6 +132,10 @@ function formatStrategyName(name: string): string {
   switch (name) {
     case "CANDLESTICK_PRICE_ACTION":
       return "Candlestick Price Action";
+    case "FAIR_VALUE_GAP":
+    case "FAIR_VALUE":
+    case "FVG":
+      return "Fair Value Gap (FVG)";
     case "SR_REVERSAL":
       return "Support & Resistance Reversal";
     case "EMA_RSI_PULLBACK":
@@ -515,9 +519,9 @@ export default function LiveSignalsPage() {
 
     const knownKeys = [
       "CANDLESTICK_PRICE_ACTION",
+      "FAIR_VALUE_GAP",
       "SR_REVERSAL",
       "EMA_RSI_PULLBACK",
-      "BOLLINGER_BANDS_BREAKOUT",
     ];
 
     const matched = knownKeys.map((key) => {
@@ -527,8 +531,8 @@ export default function LiveSignalsPage() {
             v.strategy_name === key ||
             v.strategy_name?.toUpperCase().replace(/_/g, "") ===
               key.replace(/_/g, "") ||
-            (key.includes("BOLLINGER") &&
-              v.strategy_name?.toUpperCase().includes("BOLLINGER")),
+            (key.includes("GAP") &&
+              v.strategy_name?.toUpperCase().includes("GAP")),
         ) || null
       );
     });
@@ -991,19 +995,41 @@ export default function LiveSignalsPage() {
                   <span
                     className={cn(
                       "font-bold",
-                      activeSignal.confidence_score >= 75 ? "text-emerald-400" : "text-muted-foreground",
+                      isWait
+                        ? "text-muted-foreground"
+                        : activeSignal.confidence_score >= 75
+                          ? "text-emerald-400"
+                          : activeSignal.confidence_score >= 60
+                            ? "text-teal-400"
+                            : "text-amber-400"
                     )}
                   >
-                    {activeSignal.confidence_score}/100 {activeSignal.confidence_score >= 75 ? "✓ Passed" : "(Min 75)"}
+                    {isWait
+                      ? "0/100 (Waiting Setup)"
+                      : `${activeSignal.confidence_score}/100 ${
+                          activeSignal.confidence_score >= 90
+                            ? "✓ High Confluence"
+                            : activeSignal.confidence_score >= 75
+                              ? "✓ Dual Confirmation"
+                              : activeSignal.confidence_score >= 60
+                                ? "✓ Single Confirmation"
+                                : ""
+                        }`}
                   </span>
                 </div>
                 <div className="w-full h-1.5 rounded-full bg-surface-2 overflow-hidden border border-border/60">
                   <div
                     className={cn(
                       "h-full rounded-full transition-all duration-500",
-                      activeSignal.confidence_score >= 75 ? "bg-emerald-500" : "bg-muted-foreground/30",
+                      isWait
+                        ? "bg-muted-foreground/30"
+                        : activeSignal.confidence_score >= 75
+                          ? "bg-emerald-500"
+                          : activeSignal.confidence_score >= 60
+                            ? "bg-teal-500"
+                            : "bg-amber-500"
                     )}
-                    style={{ width: `${Math.max(activeSignal.confidence_score, 0)}%` }}
+                    style={{ width: `${isWait ? 0 : Math.max(activeSignal.confidence_score, 0)}%` }}
                   />
                 </div>
               </div>
@@ -1233,7 +1259,15 @@ export default function LiveSignalsPage() {
                           </span>
                         </td>
                         <td className="px-3 py-3.5 font-mono">
-                          <span className={sig.confidence_score >= 75 ? "text-emerald-400 font-bold" : "text-foreground"}>
+                          <span
+                            className={
+                              sig.confidence_score >= 75
+                                ? "text-emerald-400 font-bold"
+                                : sig.confidence_score >= 60
+                                  ? "text-teal-400 font-bold"
+                                  : "text-foreground font-semibold"
+                            }
+                          >
                             {sig.confidence_score}
                           </span>
                           <span className="text-muted-foreground/60">/100</span>
@@ -1307,7 +1341,7 @@ export default function LiveSignalsPage() {
                           Quotex Telemetry Active — Listening for Setups
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          Browser extension is actively streaming chart ticks to the backend. Signals with confidence score &gt; 75 will appear here automatically.
+                          Browser extension is actively streaming chart ticks to the backend. Qualified signals with strategy consensus will appear here automatically.
                         </p>
                       </div>
                     </td>
