@@ -337,15 +337,24 @@ export default function LiveSignalsPage() {
   }, []);
 
   // Helper to parse signal timestamp as UTC epoch ms
-  const parseSignalTime = useCallback((dateStr?: string): number => {
+  const parseSignalTime = useCallback((dateStr?: string | number): number => {
     if (!dateStr) return 0;
+    if (typeof dateStr === "number") {
+      return dateStr < 1e11 ? dateStr * 1000 : dateStr;
+    }
+    const s = String(dateStr).trim();
+    if (!s) return 0;
+    if (/^\d+(\.\d+)?$/.test(s)) {
+      const num = parseFloat(s);
+      return num < 1e11 ? num * 1000 : num;
+    }
     const isoStr =
-      dateStr.endsWith("Z") || dateStr.includes("+") ? dateStr : `${dateStr}Z`;
+      s.endsWith("Z") || /[+-]\d{2}(:\d{2})?$/.test(s) ? s : `${s}Z`;
     const t = new Date(isoStr).getTime();
     return isNaN(t) ? 0 : t;
   }, []);
 
-  // Check if a qualified signal was generated for the active 60s candle window (under 65s age)
+  // Check if a qualified signal was generated for the active 60s candle window (with clock drift buffer)
   const isSignalStillActiveCandle = useCallback(
     (sig: SignalData | null): boolean => {
       if (!sig || !sig.created_at || !nowDate) return false;
@@ -353,8 +362,8 @@ export default function LiveSignalsPage() {
       if (!sigTime) return false;
       const nowMs = nowDate.getTime();
       const ageSeconds = (nowMs - sigTime) / 1000;
-      // In 60s binary trading, a signal is active for the full 60 seconds of that candle (with 5s buffer)
-      return ageSeconds >= 0 && ageSeconds < 65;
+      // In 60s binary trading, a signal is active for the 60 seconds of that candle (allowing [-5s, 70s] drift)
+      return ageSeconds >= -5 && ageSeconds < 70;
     },
     [nowDate, parseSignalTime],
   );

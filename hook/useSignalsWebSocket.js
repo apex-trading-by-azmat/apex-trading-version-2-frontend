@@ -29,6 +29,28 @@ import { useQueryClient } from "@tanstack/react-query";
 const normalizeKey = (sym) =>
   sym ? String(sym).toUpperCase().replace(/[\/\s\(\)\-_]/g, "").replace(/OTC$/, "") : "";
 
+const parseUtcEpoch = (val) => {
+  if (!val) return null;
+  if (typeof val === "number") {
+    return val < 1e11 ? val * 1000 : val;
+  }
+  if (typeof val === "string") {
+    let s = val.trim();
+    if (!s) return null;
+    if (/^\d+(\.\d+)?$/.test(s)) {
+      const num = parseFloat(s);
+      return num < 1e11 ? num * 1000 : num;
+    }
+    // If ISO string lacks timezone indicator (Z or +/-HH:MM), treat as UTC
+    if (!s.endsWith("Z") && !/[+-]\d{2}(:\d{2})?$/.test(s)) {
+      s += "Z";
+    }
+    const t = new Date(s).getTime();
+    return isNaN(t) ? null : t;
+  }
+  return null;
+};
+
 export function useSignalsWebSocket() {
   const queryClient = useQueryClient();
   const [sessionId, setSessionId] = useState(null);
@@ -138,20 +160,19 @@ export function useSignalsWebSocket() {
                 setActiveChartPayout(data.broker_payout);
               }
               setActiveSignal((prev) => {
-                // If prev is an active qualified UP/DOWN signal within its 60s lifecycle (with 5s buffer), keep it!
+                const isSameAsset = !prev?.asset || normalizeKey(prev.asset) === normalizeKey(activeAsset);
+
+                // If prev is an active qualified UP/DOWN signal within its 60s lifecycle (with clock skew buffer), keep it!
                 if (
                   prev &&
                   prev.is_qualified &&
                   (prev.direction === "UP" || prev.direction === "DOWN")
                 ) {
                   const createdAt = prev.created_at || prev.timestamp || prev.received_at;
-                  if (createdAt) {
-                    const ageMs = Date.now() - new Date(createdAt).getTime();
-                    if (
-                      ageMs >= 0 &&
-                      ageMs < 65000 &&
-                      (!prev.asset || normalizeKey(prev.asset) === normalizeKey(activeAsset))
-                    ) {
+                  const epoch = parseUtcEpoch(createdAt);
+                  if (epoch != null) {
+                    const ageMs = Date.now() - epoch;
+                    if (ageMs >= -5000 && ageMs < 70000 && isSameAsset) {
                       return {
                         ...prev,
                         broker_payout: data.broker_payout ?? prev.broker_payout,
@@ -159,6 +180,15 @@ export function useSignalsWebSocket() {
                     }
                   }
                 }
+
+                // If it is the same asset and prev is already in standby/wait, keep prev with updated payout
+                if (prev && isSameAsset && prev.direction === "WAIT") {
+                  return {
+                    ...prev,
+                    broker_payout: data.broker_payout ?? prev.broker_payout,
+                  };
+                }
+
                 return {
                   id: `standby-${activeAsset}`,
                   asset: activeAsset,
@@ -209,10 +239,12 @@ export function useSignalsWebSocket() {
                   prev.is_qualified &&
                   (prev.direction === "UP" || prev.direction === "DOWN")
                 ) {
+                  const isSameAsset = !prev.asset || !signalObj.asset || normalizeKey(prev.asset) === normalizeKey(signalObj.asset);
                   const createdAt = prev.created_at || prev.timestamp || prev.received_at;
-                  if (createdAt) {
-                    const ageMs = Date.now() - new Date(createdAt).getTime();
-                    if (ageMs >= 0 && ageMs < 65000) {
+                  const epoch = parseUtcEpoch(createdAt);
+                  if (epoch != null && isSameAsset) {
+                    const ageMs = Date.now() - epoch;
+                    if (ageMs >= -5000 && ageMs < 70000) {
                       return prev;
                     }
                   }
