@@ -1359,7 +1359,6 @@ export default function RegisterWizardPage() {
 
                   <button
                     type="button"
-<<<<<<< Updated upstream
                     onClick={() => {
                       const hasToken =
                         typeof window !== "undefined" &&
@@ -1371,11 +1370,7 @@ export default function RegisterWizardPage() {
                         router.push(`/auth/login${emailParam}`);
                       }
                     }}
-                    className="w-full py-3 rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-md shadow-primary/20 cursor-pointer"
-=======
-                    onClick={() => router.push("/dashboard/live-signals")}
                     className="w-full py-3 rounded-lg bg-primary hover:bg-primary-hover text-black text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-md shadow-primary/20 cursor-pointer"
->>>>>>> Stashed changes
                   >
                     <span>Launch Trading Terminal</span>
                     <ArrowRight className="w-4 h-4" />
@@ -1609,7 +1604,6 @@ export default function RegisterWizardPage() {
 
                   <button
                     type="button"
-<<<<<<< Updated upstream
                     onClick={() => {
                       const hasToken =
                         typeof window !== "undefined" &&
@@ -1621,11 +1615,7 @@ export default function RegisterWizardPage() {
                         router.push(`/auth/login${emailParam}`);
                       }
                     }}
-                    className="w-full py-3 rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-md shadow-primary/20 cursor-pointer"
-=======
-                    onClick={() => router.push("/dashboard/live-signals")}
                     className="w-full py-3 rounded-lg bg-primary hover:bg-primary-hover text-black text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-md shadow-primary/20 cursor-pointer"
->>>>>>> Stashed changes
                   >
                     <span>Launch Trading Terminal</span>
                     <ArrowRight className="w-4 h-4" />

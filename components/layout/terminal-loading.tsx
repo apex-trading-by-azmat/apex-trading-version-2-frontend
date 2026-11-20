@@ -52,7 +52,6 @@ export function TerminalLoading() {
 
       {/* ── CENTRAL TERMINAL CARD ── */}
       <div className="relative z-10 w-full max-w-md rounded-2xl bg-card/85 border border-primary/25 backdrop-blur-xl p-6 sm:p-8 shadow-2xl shadow-primary/10 flex flex-col items-center text-center space-y-6">
-        
         {/* Brand Header */}
         <div className="flex items-center gap-2.5">
           <div className="relative w-7 h-7 rounded-lg bg-gradient-to-br from-primary/20 via-surface-2 to-surface-3 p-1 border border-primary/30 shadow-[0_0_12px_rgba(240,185,11,0.2)]">
@@ -121,7 +120,9 @@ export function TerminalLoading() {
         <div className="space-y-1.5 w-full">
           <h2 className="text-base sm:text-lg font-extrabold text-foreground font-display tracking-tight transition-all duration-300">
             {currentPhase.title}
-            <span className="text-primary inline-block animate-pulse ml-1">…</span>
+            <span className="text-primary inline-block animate-pulse ml-1">
+              …
+            </span>
           </h2>
           <p className="text-xs font-mono text-muted-foreground flex items-center justify-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-primary animate-ping shrink-0" />
@@ -142,7 +143,9 @@ export function TerminalLoading() {
           </div>
           <div className="flex items-center justify-between text-[10px] font-mono text-muted-foreground px-0.5">
             <span>CORE TELEMETRY</span>
-            <span className="text-primary font-bold">{currentPhase.progress}%</span>
+            <span className="text-primary font-bold">
+              {currentPhase.progress}%
+            </span>
           </div>
         </div>
 
@@ -172,7 +175,6 @@ export function TerminalLoading() {
             </div>
           </div>
         </div>
-
       </div>
     </div>
   );
